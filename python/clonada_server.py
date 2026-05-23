@@ -19,6 +19,9 @@ import torchaudio
 import soundfile as sf
 from pathlib import Path
 
+sys.path.insert(0, os.path.dirname(__file__))
+from lib.pipeline import VoiceConversionPipeline
+
 # ═══════════════════════════════════════════════════════════
 # GPU DETECTION
 # ═══════════════════════════════════════════════════════════
@@ -37,118 +40,6 @@ def detect_device():
         return "cpu"
 
 
-# ═══════════════════════════════════════════════════════════
-# RVC INFERENCE ENGINE
-# ═══════════════════════════════════════════════════════════
-
-class RVCInferenceEngine:
-    """Handles voice conversion using RVC v2 models."""
-
-    def __init__(self, device="cpu"):
-        self.device = device
-        self.loaded_model = None
-        self.loaded_model_path = None
-        self.hubert_model = None
-        self.sample_rate = 16000
-
-    def load_hubert(self, weights_path):
-        """Load HuBERT base model for feature extraction."""
-        if not os.path.exists(weights_path):
-            print(f"[WARN] HuBERT weights not found at {weights_path}")
-            return False
-
-        try:
-            from fairseq import checkpoint_utils
-            models, _, _ = checkpoint_utils.load_model_ensemble_and_task(
-                [weights_path], suffix=""
-            )
-            self.hubert_model = models[0].to(self.device)
-            self.hubert_model.eval()
-            print(f"[OK] HuBERT model loaded from {weights_path}")
-            return True
-        except ImportError:
-            print("[WARN] fairseq not installed, HuBERT loading skipped")
-            return False
-        except Exception as e:
-            print(f"[ERROR] Failed to load HuBERT: {e}")
-            return False
-
-    def load_model(self, model_path):
-        """Load an RVC .pth voice model."""
-        if self.loaded_model_path == model_path and self.loaded_model is not None:
-            return True
-
-        if not os.path.exists(model_path):
-            print(f"[ERROR] Model not found: {model_path}")
-            return False
-
-        try:
-            checkpoint = torch.load(model_path, map_location=self.device, weights_only=False)
-            self.loaded_model = checkpoint
-            self.loaded_model_path = model_path
-            print(f"[OK] RVC model loaded: {os.path.basename(model_path)}")
-            return True
-        except Exception as e:
-            print(f"[ERROR] Failed to load model: {e}")
-            return False
-
-    def infer(self, audio_data, pitch_shift=0, formant_shift=0, method="rmvpe", mix=1.0, mode="low_latency"):
-        """
-        Run voice conversion inference.
-
-        Args:
-            audio_data: numpy float32 array of audio samples
-            pitch_shift: semitones to shift (-12 to 12)
-            formant_shift: formant adjustment (-5 to 5)
-            method: pitch extraction method (rmvpe, crepe, harvest, fcpe)
-            mix: dry/wet mix (0.0 = dry, 1.0 = wet)
-            mode: low_latency or high_quality
-
-        Returns:
-            numpy float32 array of processed audio
-        """
-        if self.loaded_model is None:
-            raise RuntimeError("No model loaded")
-
-        audio_tensor = torch.from_numpy(audio_data).float().to(self.device)
-
-        if mode == "low_latency":
-            block_size = 256
-        else:
-            block_size = 16384
-
-        # Process in blocks
-        output_chunks = []
-        total_samples = len(audio_tensor)
-
-        for start in range(0, total_samples, block_size):
-            end = min(start + block_size, total_samples)
-            chunk = audio_tensor[start:end]
-
-            with torch.no_grad():
-                # Pitch shift via resampling approximation
-                if pitch_shift != 0:
-                    ratio = 2 ** (pitch_shift / 12.0)
-                    chunk = torchaudio.functional.resample(
-                        chunk.unsqueeze(0),
-                        orig_freq=int(self.sample_rate),
-                        new_freq=int(self.sample_rate * ratio)
-                    ).squeeze(0)
-
-                # TODO: Full RVC pipeline integration
-                # For now, apply basic transformation
-                processed = chunk
-
-            output_chunks.append(processed)
-
-        output = torch.cat(output_chunks)
-
-        # Apply dry/wet mix
-        if mix < 1.0:
-            dry = torch.from_numpy(audio_data[:len(output)]).float().to(self.device)
-            output = dry * (1.0 - mix) + output * mix
-
-        return output.cpu().numpy()
 
 
 # ═══════════════════════════════════════════════════════════
@@ -237,7 +128,10 @@ class ClonadaLocalEngine:
         self.is_running = True
 
         self.device = detect_device()
-        self.rvc_engine = RVCInferenceEngine(self.device)
+        self.pipeline = VoiceConversionPipeline(
+            weights_dir=weights_dir or os.path.join(os.path.dirname(__file__), "..", "weights"),
+            device=self.device
+        )
         self.stem_separator = StemSeparator(self.device)
 
         self.models_dir = models_dir or os.path.join(os.path.dirname(__file__), "..", "models")
@@ -246,88 +140,74 @@ class ClonadaLocalEngine:
         os.makedirs(self.models_dir, exist_ok=True)
         os.makedirs(self.weights_dir, exist_ok=True)
 
-        # Load HuBERT base weights if available
-        hubert_path = os.path.join(self.weights_dir, "hubert_base.pt")
-        self.rvc_engine.load_hubert(hubert_path)
+        # Pre-load HuBERT if available
+        self.pipeline.hubert.load()
 
     def handle_swap(self, message):
-        """Process voice swap request."""
+        """Process voice swap from raw audio data."""
         try:
             audio_data = np.array(message["audio"], dtype=np.float32)
             model_path = message.get("model", "")
-            pitch = message.get("pitch", 0)
-            formant = message.get("formant", 0)
-            method = message.get("method", "rmvpe")
-            mix = message.get("mix", 1.0)
-            mode = message.get("mode", "low_latency")
+            index_path = message.get("index", "")
 
-            if not self.rvc_engine.load_model(model_path):
-                return {"status": "ERROR", "message": f"Failed to load model: {model_path}"}
+            # Write temp input file
+            tmp_in = "/tmp/clonada_swap_in.wav"
+            tmp_out = "/tmp/clonada_swap_out.wav"
+            sf.write(tmp_in, audio_data, message.get("sample_rate", 44100))
 
-            result = self.rvc_engine.infer(
-                audio_data,
-                pitch_shift=pitch,
-                formant_shift=formant,
-                method=method,
-                mix=mix,
-                mode=mode
+            self.pipeline.load_model(model_path, index_path or None)
+            self.pipeline.convert(
+                tmp_in, tmp_out,
+                pitch_shift=message.get("pitch", 0),
+                formant_shift=message.get("formant", 0),
+                method=message.get("method", "rmvpe"),
+                mix=message.get("mix", 1.0),
+                mode=message.get("mode", "low_latency"),
+                index_rate=message.get("index_rate", 0.75)
             )
 
-            return {
-                "status": "SUCCESS",
-                "audio": result.tolist(),
-                "sample_rate": self.rvc_engine.sample_rate
-            }
+            result, sr = sf.read(tmp_out, dtype="float32")
+            os.remove(tmp_in)
+            os.remove(tmp_out)
+
+            return {"status": "SUCCESS", "audio": result.tolist(), "sample_rate": sr}
         except Exception as e:
             return {"status": "ERROR", "message": str(e)}
 
     def handle_swap_file(self, message):
-        """Process voice swap from file path (more efficient for large audio)."""
+        """Process voice swap from file path (efficient for large audio)."""
         try:
             input_path = message["input"]
             output_path = message.get("output", input_path.replace(".wav", "_clonada.wav"))
             model_path = message["model"]
-            pitch = message.get("pitch", 0)
-            formant = message.get("formant", 0)
-            method = message.get("method", "rmvpe")
-            mix = message.get("mix", 1.0)
-            mode = message.get("mode", "low_latency")
+            index_path = message.get("index", "")
             progress_file = message.get("progress", "")
 
-            # Load audio
-            audio_data, sr = sf.read(input_path, dtype="float32")
-            if len(audio_data.shape) > 1:
-                audio_data = audio_data.mean(axis=1)
+            def write_progress(val, text):
+                if progress_file:
+                    try:
+                        with open(progress_file, "w") as f:
+                            f.write(f"{val}|{text}")
+                    except:
+                        pass
 
-            self.rvc_engine.sample_rate = sr
-
-            if not self.rvc_engine.load_model(model_path):
-                return {"status": "ERROR", "message": f"Failed to load model: {model_path}"}
-
-            # Write progress
-            if progress_file:
-                with open(progress_file, "w") as f:
-                    f.write("0.3|Loading model...")
-
-            result = self.rvc_engine.infer(
-                audio_data, pitch_shift=pitch, formant_shift=formant,
-                method=method, mix=mix, mode=mode
+            self.pipeline.load_model(model_path, index_path or None)
+            self.pipeline.convert(
+                input_path, output_path,
+                pitch_shift=message.get("pitch", 0),
+                formant_shift=message.get("formant", 0),
+                method=message.get("method", "rmvpe"),
+                mix=message.get("mix", 1.0),
+                mode=message.get("mode", "low_latency"),
+                index_rate=message.get("index_rate", 0.75),
+                progress_callback=write_progress
             )
 
-            if progress_file:
-                with open(progress_file, "w") as f:
-                    f.write("0.8|Saving output...")
-
-            sf.write(output_path, result, sr)
-
-            if progress_file:
-                with open(progress_file, "w") as f:
-                    f.write("1.0|Complete")
-
+            audio_info = sf.info(output_path)
             return {
                 "status": "SUCCESS",
                 "output": output_path,
-                "duration": len(result) / sr
+                "duration": audio_info.duration
             }
         except Exception as e:
             return {"status": "ERROR", "message": str(e)}
