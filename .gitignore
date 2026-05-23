@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+*.spec
+.env
+*.pth
+*.index
+models/
+weights/
+*.tmp
+progress.tmp
+train_progress.tmp
+output.wav
+.DS_Store
