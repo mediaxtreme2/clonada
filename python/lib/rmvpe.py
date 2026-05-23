@@ -1,6 +1,7 @@
 """
 RMVPE - Robust Model for Vocal Pitch Estimation
-DeepUnet encoder-decoder + BiGRU + Linear(360) for pitch class prediction.
+Deep ResUNet + BiGRU + Linear(360) for pitch class prediction.
+Architecture matches the official RMVPE pretrained weights.
 """
 
 import numpy as np
@@ -9,116 +10,157 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class ConvBlock(nn.Module):
-    def __init__(self, in_ch, out_ch, kernel=3, stride=1):
-        super().__init__()
-        self.conv = nn.Conv2d(in_ch, out_ch, kernel, stride, kernel // 2)
-        self.bn = nn.BatchNorm2d(out_ch)
-
-    def forward(self, x):
-        return F.relu(self.bn(self.conv(x)))
-
-
-class EncoderBlock(nn.Module):
+class ResBlock(nn.Module):
     def __init__(self, in_ch, out_ch):
         super().__init__()
-        self.conv1 = ConvBlock(in_ch, out_ch)
-        self.conv2 = ConvBlock(out_ch, out_ch)
+        self.conv = nn.Sequential(
+            nn.Conv2d(in_ch, out_ch, 3, 1, 1, bias=False),
+            nn.BatchNorm2d(out_ch),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_ch, out_ch, 3, 1, 1, bias=False),
+            nn.BatchNorm2d(out_ch),
+        )
+        self.shortcut = nn.Conv2d(in_ch, out_ch, 1) if in_ch != out_ch else None
+
+    def forward(self, x):
+        identity = self.shortcut(x) if self.shortcut is not None else x
+        return F.relu(self.conv(x) + identity)
+
+
+class ResLayer(nn.Module):
+    def __init__(self, in_ch, out_ch, n_blocks=4):
+        super().__init__()
+        self.conv = nn.ModuleList([ResBlock(in_ch, out_ch)])
+        for _ in range(n_blocks - 1):
+            self.conv.append(ResBlock(out_ch, out_ch))
+
+    def forward(self, x):
+        for block in self.conv:
+            x = block(x)
+        return x
+
+
+class UNetEncoder(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.bn = nn.BatchNorm2d(1)
+        channels = [1, 16, 32, 64, 128, 256]
+        self.layers = nn.ModuleList()
+        for i in range(5):
+            self.layers.append(ResLayer(channels[i], channels[i + 1]))
         self.pool = nn.MaxPool2d(2)
 
     def forward(self, x):
-        x = self.conv1(x)
-        x = self.conv2(x)
-        return self.pool(x), x  # pooled, skip
+        x = self.bn(x)
+        skips = []
+        for layer in self.layers:
+            x = layer(x)
+            skips.append(x)
+            x = self.pool(x)
+        return x, skips
 
 
-class DecoderBlock(nn.Module):
-    def __init__(self, in_ch, out_ch):
+class UNetDecoder(nn.Module):
+    def __init__(self):
         super().__init__()
-        self.up = nn.ConvTranspose2d(in_ch, out_ch, 2, 2)
-        self.conv1 = ConvBlock(out_ch * 2, out_ch)
-        self.conv2 = ConvBlock(out_ch, out_ch)
+        enc_channels = [256, 128, 64, 32, 16]
+        dec_in = [512, 256, 128, 64, 32]
+        dec_out = [256, 128, 64, 32, 16]
+
+        self.layers = nn.ModuleList()
+        for i in range(5):
+            self.layers.append(DecoderLayer(dec_in[i], dec_out[i], enc_channels[i]))
+
+    def forward(self, x, skips):
+        for i, layer in enumerate(self.layers):
+            x = layer(x, skips[-(i + 1)])
+        return x
+
+
+class DecoderLayer(nn.Module):
+    def __init__(self, in_ch, out_ch, skip_ch):
+        super().__init__()
+        self.conv1 = nn.Sequential(
+            nn.ConvTranspose2d(in_ch, out_ch, 3, stride=2, padding=1, output_padding=1, bias=False),
+            nn.BatchNorm2d(out_ch),
+        )
+        concat_ch = out_ch + skip_ch
+        self.conv2 = nn.ModuleList([ResBlock(concat_ch, out_ch)])
+        for _ in range(3):
+            self.conv2.append(ResBlock(out_ch, out_ch))
 
     def forward(self, x, skip):
-        x = self.up(x)
-        # Handle size mismatch
-        if x.shape != skip.shape:
-            x = F.interpolate(x, size=skip.shape[2:])
-        x = torch.cat([x, skip], dim=1)
         x = self.conv1(x)
-        return self.conv2(x)
+        if x.shape[2:] != skip.shape[2:]:
+            x = F.interpolate(x, size=skip.shape[2:], mode='bilinear', align_corners=False)
+        x = torch.cat([x, skip], dim=1)
+        for block in self.conv2:
+            x = block(x)
+        return x
+
+
+class BiGRUWrapper(nn.Module):
+    def __init__(self, input_size, hidden_size):
+        super().__init__()
+        self.gru = nn.GRU(input_size, hidden_size, batch_first=True, bidirectional=True)
+
+    def forward(self, x):
+        return self.gru(x)[0]
+
+
+class Intermediate(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.layers = nn.ModuleList([
+            ResLayer(256, 512, n_blocks=4),
+            ResLayer(512, 512, n_blocks=4),
+            ResLayer(512, 512, n_blocks=4),
+            ResLayer(512, 512, n_blocks=4),
+        ])
+
+    def forward(self, x):
+        for layer in self.layers:
+            x = layer(x)
+        return x
 
 
 class DeepUnet(nn.Module):
-    """5-level UNet for pitch estimation."""
-
     def __init__(self):
         super().__init__()
-        channels = [1, 16, 32, 64, 128, 256]
-
-        self.encoders = nn.ModuleList()
-        for i in range(5):
-            self.encoders.append(EncoderBlock(channels[i], channels[i + 1]))
-
-        self.bottleneck = nn.Sequential(
-            ConvBlock(256, 512),
-            ConvBlock(512, 256)
-        )
-
-        self.decoders = nn.ModuleList()
-        for i in range(4, -1, -1):
-            self.decoders.append(DecoderBlock(channels[i + 1], channels[i]))
+        self.encoder = UNetEncoder()
+        self.intermediate = Intermediate()
+        self.decoder = UNetDecoder()
 
     def forward(self, x):
-        skips = []
-        for enc in self.encoders:
-            x, skip = enc(x)
-            skips.append(skip)
-
-        x = self.bottleneck(x)
-
-        for i, dec in enumerate(self.decoders):
-            x = dec(x, skips[-(i + 1)])
-
+        x, skips = self.encoder(x)
+        x = self.intermediate(x)
+        x = self.decoder(x, skips)
         return x
 
 
 class E2E(nn.Module):
-    """End-to-end RMVPE model: DeepUnet -> CNN -> BiGRU -> Linear(360)."""
+    """End-to-end RMVPE: DeepUnet -> Conv -> BiGRU -> Linear(360)."""
 
     def __init__(self):
         super().__init__()
         self.unet = DeepUnet()
-        self.cnn = nn.Sequential(
-            nn.Conv2d(1, 3, (3, 3), padding=(1, 1)),
-            nn.BatchNorm2d(3),
-            nn.ReLU()
-        )
+        self.cnn = nn.Conv2d(16, 3, 3, padding=1)
         self.fc = nn.Sequential(
-            nn.Linear(3 * 128, 256),
-            nn.ReLU(),
-            nn.Dropout(0.25)
+            BiGRUWrapper(384, 256),
+            nn.Linear(512, 360),
         )
-        self.gru = nn.GRU(256, 128, batch_first=True, bidirectional=True)
-        self.out = nn.Linear(256, 360)
 
     def forward(self, mel):
-        # mel: [B, 1, 128, T]
-        x = self.unet(mel)  # [B, 1, 128, T]
-        x = self.cnn(x)  # [B, 3, 128, T]
-
-        # Reshape for GRU: [B, T, 3*128]
+        x = self.unet(mel)
+        x = self.cnn(x)
         b, c, f, t = x.shape
         x = x.permute(0, 3, 1, 2).reshape(b, t, c * f)
         x = self.fc(x)
-        x, _ = self.gru(x)  # [B, T, 256]
-        x = torch.sigmoid(self.out(x))  # [B, T, 360]
+        x = torch.sigmoid(x)
         return x
 
 
 class MelSpectrogram(nn.Module):
-    """Compute mel spectrogram for RMVPE input."""
-
     def __init__(self, n_mel=128, sr=16000, n_fft=1024, hop=160):
         super().__init__()
         self.n_mel = n_mel
@@ -128,13 +170,8 @@ class MelSpectrogram(nn.Module):
 
         import torchaudio
         self.mel_transform = torchaudio.transforms.MelSpectrogram(
-            sample_rate=sr,
-            n_fft=n_fft,
-            hop_length=hop,
-            n_mels=n_mel,
-            f_min=30,
-            f_max=sr // 2,
-            power=1.0
+            sample_rate=sr, n_fft=n_fft, hop_length=hop, n_mels=n_mel,
+            f_min=30, f_max=sr // 2, power=1.0
         )
 
     def forward(self, audio):
@@ -146,7 +183,6 @@ class MelSpectrogram(nn.Module):
 class RMVPE:
     """RMVPE pitch extraction wrapper."""
 
-    # 360 pitch classes: cents mapping from ~C1 to ~B6
     CENTS_MAPPING = np.arange(360) * 20 + 1997.3794084376191
 
     def __init__(self, model_path, is_half=False, device="cpu"):
@@ -168,49 +204,34 @@ class RMVPE:
             self.model = self.model.half()
 
     def infer_from_audio(self, audio, thred=0.03):
-        """
-        Extract f0 from audio tensor.
-
-        Args:
-            audio: torch tensor of audio at 16kHz
-            thred: voicing threshold (0-1)
-
-        Returns:
-            numpy array of f0 values in Hz, 0 for unvoiced
-        """
         if audio.dim() == 1:
             audio = audio.unsqueeze(0)
 
         audio = audio.to(self.device)
 
         with torch.no_grad():
-            mel = self.mel_extractor(audio)  # [1, 128, T]
-            mel = mel.unsqueeze(1)  # [1, 1, 128, T]
+            mel = self.mel_extractor(audio)
+            mel = mel.unsqueeze(1)
 
             if self.is_half:
                 mel = mel.half()
 
-            output = self.model(mel)  # [1, T, 360]
+            output = self.model(mel)
 
-        output = output[0].cpu().numpy()  # [T, 360]
+        output = output[0].cpu().numpy()
         return self._decode_pitch(output, thred)
 
     def _decode_pitch(self, output, thred):
-        """Decode 360-class output to Hz values."""
-        # output: [T, 360]
         confidence = np.max(output, axis=1)
         f0 = np.zeros(len(output))
 
         for i in range(len(output)):
             if confidence[i] < thred:
-                f0[i] = 0.0
                 continue
 
-            # Weighted average of top activations for sub-bin precision
             probs = output[i]
             center = np.argmax(probs)
 
-            # Use 5-bin window around peak
             start = max(0, center - 2)
             end = min(360, center + 3)
             weights = probs[start:end]
@@ -219,7 +240,5 @@ class RMVPE:
             if np.sum(weights) > 0:
                 avg_cents = np.sum(weights * cents) / np.sum(weights)
                 f0[i] = 10 * (2 ** (avg_cents / 1200))
-            else:
-                f0[i] = 0.0
 
         return f0

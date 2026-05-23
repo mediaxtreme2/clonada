@@ -46,25 +46,43 @@ class TextEncoder768(nn.Module):
         return m, logs, x_mask
 
 
+class LayerNorm(nn.Module):
+    """LayerNorm with gamma/beta parameter names (RVC checkpoint format)."""
+
+    def __init__(self, channels, eps=1e-5):
+        super().__init__()
+        self.channels = channels
+        self.eps = eps
+        self.gamma = nn.Parameter(torch.ones(channels))
+        self.beta = nn.Parameter(torch.zeros(channels))
+
+    def forward(self, x):
+        x = x.transpose(1, -1)
+        x = F.layer_norm(x, (self.channels,), self.gamma, self.beta, self.eps)
+        return x.transpose(1, -1)
+
+
 class Encoder(nn.Module):
     """Multi-head attention encoder with FFN layers."""
 
     def __init__(self, hidden_channels, filter_channels, n_heads,
-                 n_layers, kernel_size, p_dropout):
+                 n_layers, kernel_size, p_dropout, window_size=10):
         super().__init__()
-        self.layers = nn.ModuleList()
-        self.norms_1 = nn.ModuleList()
-        self.norms_2 = nn.ModuleList()
+        self.hidden_channels = hidden_channels
+        self.n_layers = n_layers
 
-        for _ in range(n_layers):
-            self.layers.append(
-                MultiHeadAttention(hidden_channels, hidden_channels, n_heads, p_dropout)
-            )
-            self.norms_1.append(nn.LayerNorm(hidden_channels))
-            self.norms_2.append(nn.LayerNorm(hidden_channels))
-
+        self.attn_layers = nn.ModuleList()
+        self.norm_layers_1 = nn.ModuleList()
+        self.norm_layers_2 = nn.ModuleList()
         self.ffn_layers = nn.ModuleList()
+
         for _ in range(n_layers):
+            self.attn_layers.append(
+                MultiHeadAttention(hidden_channels, hidden_channels, n_heads,
+                                   p_dropout, window_size=window_size)
+            )
+            self.norm_layers_1.append(LayerNorm(hidden_channels))
+            self.norm_layers_2.append(LayerNorm(hidden_channels))
             self.ffn_layers.append(
                 FFN(hidden_channels, filter_channels, kernel_size, p_dropout)
             )
@@ -72,25 +90,28 @@ class Encoder(nn.Module):
         self.drop = nn.Dropout(p_dropout)
 
     def forward(self, x, x_mask):
-        for i in range(len(self.layers)):
-            x_t = x.transpose(1, 2)
-            attn_out = self.layers[i](x_t, x_t, x_t)
-            attn_out = attn_out.transpose(1, 2)
-            x = x + self.drop(attn_out)
-            x_t = x.transpose(1, 2)
-            x_t = self.norms_1[i](x_t).transpose(1, 2)
-            ffn_out = self.ffn_layers[i](x_t, x_mask)
-            x = x + self.drop(ffn_out)
-            x_t = x.transpose(1, 2)
-            x = self.norms_2[i](x_t).transpose(1, 2)
-        return x * x_mask
+        attn_mask = x_mask.unsqueeze(2) * x_mask.unsqueeze(-1)
+        x = x * x_mask
+        for i in range(self.n_layers):
+            y = self.attn_layers[i](x, x, attn_mask)
+            y = self.drop(y)
+            x = self.norm_layers_1[i](x + y)
+            y = self.ffn_layers[i](x, x_mask)
+            y = self.drop(y)
+            x = self.norm_layers_2[i](x + y)
+        x = x * x_mask
+        return x
 
 
 class MultiHeadAttention(nn.Module):
-    def __init__(self, channels, out_channels, n_heads, p_dropout=0.0):
+    def __init__(self, channels, out_channels, n_heads, p_dropout=0.0,
+                 window_size=None):
         super().__init__()
+        self.channels = channels
+        self.out_channels = out_channels
         self.n_heads = n_heads
         self.k_channels = channels // n_heads
+        self.window_size = window_size
 
         self.conv_q = nn.Conv1d(channels, channels, 1)
         self.conv_k = nn.Conv1d(channels, channels, 1)
@@ -98,28 +119,88 @@ class MultiHeadAttention(nn.Module):
         self.conv_o = nn.Conv1d(channels, out_channels, 1)
         self.drop = nn.Dropout(p_dropout)
 
-    def forward(self, x, key, value, mask=None):
-        x = x.transpose(1, 2)
-        key = key.transpose(1, 2)
-        value = value.transpose(1, 2)
+        if window_size is not None:
+            n_heads_rel = 1
+            rel_stddev = self.k_channels ** -0.5
+            self.emb_rel_k = nn.Parameter(
+                torch.randn(n_heads_rel, window_size * 2 + 1, self.k_channels) * rel_stddev
+            )
+            self.emb_rel_v = nn.Parameter(
+                torch.randn(n_heads_rel, window_size * 2 + 1, self.k_channels) * rel_stddev
+            )
 
+    def forward(self, x, c, attn_mask=None):
         q = self.conv_q(x)
-        k = self.conv_k(key)
-        v = self.conv_v(value)
+        k = self.conv_k(c)
+        v = self.conv_v(c)
 
-        b, c, t = q.shape
-        q = q.view(b, self.n_heads, self.k_channels, t).transpose(2, 3)
-        k = k.view(b, self.n_heads, self.k_channels, -1).transpose(2, 3)
-        v = v.view(b, self.n_heads, self.k_channels, -1).transpose(2, 3)
+        x, _ = self.attention(q, k, v, mask=attn_mask)
+        x = self.conv_o(x)
+        return x
 
-        scores = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(self.k_channels)
+    def attention(self, query, key, value, mask=None):
+        b, d, t_s = key.shape
+        t_t = query.shape[2]
+
+        query = query.view(b, self.n_heads, self.k_channels, t_t).transpose(2, 3)
+        key = key.view(b, self.n_heads, self.k_channels, t_s).transpose(2, 3)
+        value = value.view(b, self.n_heads, self.k_channels, t_s).transpose(2, 3)
+
+        scores = torch.matmul(query / math.sqrt(self.k_channels), key.transpose(-2, -1))
+
+        if self.window_size is not None:
+            key_relative_embeddings = self._get_relative_embeddings(self.emb_rel_k, t_s)
+            rel_logits = self._matmul_with_relative_keys(
+                query / math.sqrt(self.k_channels), key_relative_embeddings
+            )
+            scores_local = self._relative_position_to_absolute_position(rel_logits)
+            scores = scores + scores_local
+
         if mask is not None:
-            scores = scores.masked_fill(mask == 0, -1e9)
+            scores = scores.masked_fill(mask == 0, -1e4)
 
-        attn = self.drop(F.softmax(scores, dim=-1))
-        out = torch.matmul(attn, v)
-        out = out.transpose(2, 3).contiguous().view(b, c, t)
-        return self.conv_o(out).transpose(1, 2)
+        p_attn = self.drop(F.softmax(scores, dim=-1))
+        output = torch.matmul(p_attn, value)
+
+        if self.window_size is not None:
+            relative_weights = self._absolute_position_to_relative_position(p_attn)
+            value_relative_embeddings = self._get_relative_embeddings(self.emb_rel_v, t_s)
+            output = output + self._matmul_with_relative_values(
+                relative_weights, value_relative_embeddings
+            )
+
+        output = output.transpose(2, 3).contiguous().view(b, d, t_t)
+        return output, p_attn
+
+    def _matmul_with_relative_values(self, x, y):
+        return torch.matmul(x, y.unsqueeze(0))
+
+    def _matmul_with_relative_keys(self, x, y):
+        return torch.matmul(x, y.unsqueeze(0).transpose(-2, -1))
+
+    def _get_relative_embeddings(self, relative_embeddings, length):
+        pad_length = max(length - (self.window_size + 1), 0)
+        slice_start = max((self.window_size + 1) - length, 0)
+        slice_end = slice_start + 2 * length - 1
+        if pad_length > 0:
+            padded = F.pad(relative_embeddings, [0, 0, pad_length, pad_length, 0, 0])
+        else:
+            padded = relative_embeddings
+        return padded[:, slice_start:slice_end]
+
+    def _relative_position_to_absolute_position(self, x):
+        batch, heads, length, _ = x.size()
+        x = F.pad(x, [0, 1, 0, 0, 0, 0, 0, 0])
+        x_flat = x.view([batch, heads, length * 2 * length])
+        x_flat = F.pad(x_flat, [0, length - 1, 0, 0, 0, 0])
+        return x_flat.view([batch, heads, length + 1, 2 * length - 1])[:, :, :length, length - 1:]
+
+    def _absolute_position_to_relative_position(self, x):
+        batch, heads, length, _ = x.size()
+        x = F.pad(x, [0, length - 1, 0, 0, 0, 0, 0, 0])
+        x_flat = x.view([batch, heads, length ** 2 + length * (length - 1)])
+        x_flat = F.pad(x_flat, [length, 0, 0, 0, 0, 0])
+        return x_flat.view([batch, heads, length, 2 * length])[:, :, :, 1:]
 
 
 class FFN(nn.Module):
@@ -189,10 +270,9 @@ class GeneratorNSF(nn.Module):
         har_source, _, _ = self.m_source(f0)
         har_source = har_source.transpose(1, 2)
 
+        x = self.conv_pre(x)
         if g is not None:
             x = x + self.cond(g)
-
-        x = self.conv_pre(x)
 
         for i in range(self.num_upsamples):
             x = F.leaky_relu(x, 0.1)
