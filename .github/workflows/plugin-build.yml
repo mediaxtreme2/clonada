@@ -33,7 +33,7 @@ jobs:
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
         run: |
-          vcpkg install zeromq:x64-windows
+          vcpkg install zeromq:x64-windows-static
 
       - name: Configure CMake (macOS)
         if: runner.os == 'macOS'
@@ -45,7 +45,7 @@ jobs:
         working-directory: plugin
         shell: pwsh
         run: |
-          cmake -B build -DCMAKE_BUILD_TYPE=Release "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake"
+          cmake -B build -DCMAKE_BUILD_TYPE=Release "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows-static
 
       - name: Build
         working-directory: plugin

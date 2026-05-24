@@ -16,14 +16,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(JUCE)
 
-# Find ZeroMQ - try system/vcpkg first, then build from source
+# Find ZeroMQ - prefer static to avoid DLL dependency issues in plugins
 find_package(ZeroMQ CONFIG QUIET)
-if(ZeroMQ_FOUND OR TARGET libzmq)
+if(ZeroMQ_FOUND OR TARGET libzmq-static OR TARGET libzmq)
     message(STATUS "Found ZeroMQ via find_package")
-    if(TARGET libzmq)
-        set(ZMQ_LIBRARIES libzmq)
-    elseif(TARGET libzmq-static)
+    if(TARGET libzmq-static)
         set(ZMQ_LIBRARIES libzmq-static)
+    elseif(TARGET libzmq)
+        set(ZMQ_LIBRARIES libzmq)
     else()
         set(ZMQ_LIBRARIES ${ZeroMQ_LIBRARIES})
     endif()
