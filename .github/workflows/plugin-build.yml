@@ -74,3 +74,4 @@ jobs:
         with:
           name: ${{ matrix.artifact }}
           path: plugin/dist/
+          retention-days: 7
