@@ -15,3 +15,5 @@ progress.tmp
 train_progress.tmp
 output.wav
 .DS_Store
+*.wav
+*.mp3

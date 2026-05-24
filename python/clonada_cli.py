@@ -117,7 +117,7 @@ def cmd_train(args):
     write_progress(args.progress, 0.1, "Submitting training job to RunPod...")
 
     # RunPod serverless endpoint
-    endpoint_url = "https://api.runpod.ai/v2/clonada-train/run"
+    endpoint_url = f"https://api.runpod.ai/v2/{args.runpod_endpoint or 'lmxzg81itmh3on'}/run"
 
     payload = {
         "input": {
@@ -137,7 +137,8 @@ def cmd_train(args):
         write_progress(args.progress, 0.2, f"Job submitted: {job_id}")
 
         # Poll for completion
-        status_url = f"https://api.runpod.ai/v2/clonada-train/status/{job_id}"
+        endpoint_id = args.runpod_endpoint or 'lmxzg81itmh3on'
+        status_url = f"https://api.runpod.ai/v2/{endpoint_id}/status/{job_id}"
         while True:
             time.sleep(10)
             status_resp = requests.get(status_url, headers=headers, timeout=30)
@@ -236,6 +237,7 @@ def main():
     parser.add_argument("--batch_size", type=int, default=8)
     parser.add_argument("--sample_rate", type=int, default=40000)
     parser.add_argument("--runpod_key", type=str, default="", help="RunPod API key")
+    parser.add_argument("--runpod_endpoint", type=str, default="lmxzg81itmh3on", help="RunPod endpoint ID")
     parser.add_argument("--models_dir", type=str, default="", help="Models directory")
 
     # Activation args

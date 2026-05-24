@@ -1,4 +1,4 @@
-name: Build RunPod Docker Image
+name: Sync RunPod Worker Image
 
 on:
   push:
@@ -9,42 +9,31 @@ on:
       - '.github/workflows/docker-build.yml'
   workflow_dispatch:
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}/runpod-worker
-
 jobs:
-  build-and-push:
+  sync-worker:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Prepare build context
+      - name: Sync to public worker repo
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cp -r python runpod/python
-
-      - name: Build and push
-        uses: docker/build-push-action@v5
-        with:
-          context: ./runpod
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          git clone https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository_owner }}/clonada-worker.git worker
+          cd worker
+          rm -rf python/lib handler.py Dockerfile requirements.txt
+          cp -r ../python/lib python/lib
+          cp ../runpod/handler.py .
+          cp ../runpod/Dockerfile .
+          cp ../runpod/requirements.txt .
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No changes to sync"
+          else
+            git commit -m "Sync from main repo"
+            git push
+          fi
