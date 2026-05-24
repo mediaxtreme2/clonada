@@ -11,13 +11,16 @@ on:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest]
+        os: [windows-latest, macos-14]
         include:
           - os: windows-latest
             artifact: clonada-windows
-          - os: macos-latest
+            cmake_extra: -DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake
+          - os: macos-14
             artifact: clonada-macos
+            cmake_extra: ""
 
     runs-on: ${{ matrix.os }}
 
@@ -34,10 +37,17 @@ jobs:
         run: |
           vcpkg install zeromq:x64-windows
 
-      - name: Configure CMake
+      - name: Configure CMake (macOS)
+        if: runner.os == 'macOS'
         working-directory: plugin
         run: |
-          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+
+      - name: Configure CMake (Windows)
+        if: runner.os == 'Windows'
+        working-directory: plugin
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
 
       - name: Build
         working-directory: plugin
