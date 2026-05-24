@@ -165,12 +165,12 @@ void ZmqBridge::processQueue() {
 
     if (status == "SUCCESS") {
         juce::String respAudioB64 = respObj->getProperty("audio_b64").toString();
-        juce::MemoryBlock decoded;
-        juce::Base64::convertFromBase64(decoded, respAudioB64);
+        juce::MemoryOutputStream mos;
+        juce::Base64::convertFromBase64(mos, respAudioB64);
 
-        size_t numSamples = decoded.getSize() / sizeof(float);
+        size_t numSamples = mos.getDataSize() / sizeof(float);
         std::vector<float> audioOut(numSamples);
-        std::memcpy(audioOut.data(), decoded.getData(), decoded.getSize());
+        std::memcpy(audioOut.data(), mos.getData(), mos.getDataSize());
 
         juce::ScopedLock lock(responseLock_);
         lastResponse_ = {std::move(audioOut), true, ""};
