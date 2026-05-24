@@ -27,6 +27,17 @@ class HuBERTFeatureExtractor:
         if self.model is not None:
             return True
 
+        try:
+            from transformers import HubertModel
+            self.model = HubertModel.from_pretrained("facebook/hubert-base-ls960")
+            self.model = self.model.to(self.device)
+            self.model.eval()
+            self._use_transformers = True
+            print("[OK] HuBERT loaded via transformers (facebook/hubert-base-ls960)")
+            return True
+        except Exception as e:
+            print(f"[WARN] Transformers HuBERT failed: {e}, trying fairseq...")
+
         if not os.path.exists(self.model_path):
             print(f"[ERROR] HuBERT weights not found: {self.model_path}")
             return False
@@ -40,48 +51,46 @@ class HuBERTFeatureExtractor:
             self.model.eval()
             print(f"[OK] HuBERT loaded from {self.model_path}")
             return True
-        except ImportError:
-            print("[WARN] fairseq not available, trying transformers HuBERT")
-            return self._load_transformers()
         except Exception as e:
             print(f"[ERROR] HuBERT load failed: {e}")
             return False
 
-    def _load_transformers(self):
-        """Fallback: use transformers library HuBERT."""
-        try:
-            from transformers import HubertModel
-            self.model = HubertModel.from_pretrained("facebook/hubert-base-ls960")
-            self.model = self.model.to(self.device)
-            self.model.eval()
-            self._use_transformers = True
-            print("[OK] HuBERT loaded via transformers")
-            return True
-        except Exception as e:
-            print(f"[ERROR] Transformers HuBERT failed: {e}")
-            return False
-
-    def extract(self, audio_16k):
+    def extract(self, audio_16k, chunk_seconds=30):
         """
-        Extract features from 16kHz audio.
+        Extract features from 16kHz audio with chunking for long files.
         Returns: [1, T/320, 768] tensor
         """
         if self.model is None:
             raise RuntimeError("HuBERT model not loaded")
 
+        chunk_samples = chunk_seconds * 16000
+        total_samples = len(audio_16k)
+
+        if total_samples <= chunk_samples:
+            return self._extract_chunk(audio_16k)
+
+        all_feats = []
+        for start in range(0, total_samples, chunk_samples):
+            end = min(start + chunk_samples, total_samples)
+            chunk = audio_16k[start:end]
+            feats = self._extract_chunk(chunk)
+            all_feats.append(feats)
+
+        return torch.cat(all_feats, dim=1)
+
+    def _extract_chunk(self, audio_16k):
         with torch.no_grad():
             audio_tensor = torch.from_numpy(audio_16k).float().unsqueeze(0).to(self.device)
 
             if hasattr(self, '_use_transformers') and self._use_transformers:
                 outputs = self.model(audio_tensor, output_hidden_states=True)
-                feats = outputs.hidden_states[12]  # layer 12
+                feats = outputs.hidden_states[12]
             else:
                 padding_mask = torch.zeros(audio_tensor.shape, dtype=torch.bool, device=self.device)
                 inputs = {"source": audio_tensor, "padding_mask": padding_mask, "output_layer": 12}
                 logits = self.model.extract_features(**inputs)
                 feats = logits[0]
 
-            # Interpolate 2x to match pitch frame rate
             feats = F.interpolate(feats.transpose(1, 2), scale_factor=2).transpose(1, 2)
 
         return feats
@@ -112,15 +121,31 @@ class RMVPEPitchExtractor:
             print(f"[ERROR] RMVPE load failed: {e}, using fallback")
             return False
 
-    def extract(self, audio_16k, threshold=0.03):
-        """Extract f0 from 16kHz audio. Returns Hz array at 10ms hop."""
-        if self.model is not None:
+    def extract(self, audio_16k, threshold=0.03, chunk_seconds=30):
+        """Extract f0 from 16kHz audio with chunking. Returns Hz array at 10ms hop."""
+        if self.model is None:
+            return self._fallback_f0(audio_16k)
+
+        chunk_samples = chunk_seconds * 16000
+        total_samples = len(audio_16k)
+
+        if total_samples <= chunk_samples:
             return self.model.infer_from_audio(
                 torch.from_numpy(audio_16k).float().to(self.device),
                 thred=threshold
             )
-        else:
-            return self._fallback_f0(audio_16k)
+
+        all_f0 = []
+        for start in range(0, total_samples, chunk_samples):
+            end = min(start + chunk_samples, total_samples)
+            chunk = audio_16k[start:end]
+            f0_chunk = self.model.infer_from_audio(
+                torch.from_numpy(chunk).float().to(self.device),
+                thred=threshold
+            )
+            all_f0.append(f0_chunk)
+
+        return np.concatenate(all_f0)
 
     def _fallback_f0(self, audio_16k):
         """Simple autocorrelation-based f0 extraction as fallback."""
@@ -327,17 +352,33 @@ class VoiceConversionPipeline:
         pitch = torch.LongTensor(f0_coarse).unsqueeze(0).to(self.device)
         pitchf = torch.FloatTensor(f0).unsqueeze(0).to(self.device)
 
-        # 5. Voice conversion inference
+        # 5. Voice conversion inference (chunked for long files)
         progress(0.50, "Running voice conversion...")
-        p_len_tensor = torch.LongTensor([p_len]).to(self.device)
         sid = torch.LongTensor([0]).to(self.device)
 
-        with torch.no_grad():
-            audio_out = self.net_g.infer(
-                feats, p_len_tensor, pitch, pitchf, sid
-            )[0][0, 0]
-
-        audio_out = audio_out.cpu().numpy()
+        chunk_size = 3000  # ~30s of frames
+        if p_len <= chunk_size:
+            p_len_tensor = torch.LongTensor([p_len]).to(self.device)
+            with torch.no_grad():
+                audio_out = self.net_g.infer(
+                    feats, p_len_tensor, pitch, pitchf, sid
+                )[0][0, 0].cpu().numpy()
+        else:
+            audio_chunks = []
+            for i in range(0, p_len, chunk_size):
+                end = min(i + chunk_size, p_len)
+                c_len = end - i
+                c_feats = feats[:, i:end, :]
+                c_pitch = pitch[:, i:end]
+                c_pitchf = pitchf[:, i:end]
+                c_len_t = torch.LongTensor([c_len]).to(self.device)
+                with torch.no_grad():
+                    chunk_out = self.net_g.infer(
+                        c_feats, c_len_t, c_pitch, c_pitchf, sid
+                    )[0][0, 0].cpu().numpy()
+                audio_chunks.append(chunk_out)
+                progress(0.50 + 0.30 * (end / p_len), f"Converting chunk {i//chunk_size + 1}...")
+            audio_out = np.concatenate(audio_chunks)
 
         # 6. Trim padding
         t_pad_out = int(t_pad * (self.model_sr / 16000))
