@@ -1,0 +1,69 @@
+name: Build Clonada Plugin
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'plugin/**'
+      - '.github/workflows/plugin-build.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest]
+        include:
+          - os: windows-latest
+            artifact: clonada-windows
+          - os: macos-latest
+            artifact: clonada-macos
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install pkg-config zeromq
+
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          vcpkg install zeromq:x64-windows
+
+      - name: Configure CMake
+        working-directory: plugin
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        working-directory: plugin
+        run: |
+          cmake --build build --config Release --parallel
+
+      - name: Package artifacts (macOS)
+        if: runner.os == 'macOS'
+        working-directory: plugin
+        run: |
+          mkdir -p dist
+          cp -r build/Clonada_artefacts/Release/VST3/Clonada.vst3 dist/ 2>/dev/null || true
+          cp -r build/Clonada_artefacts/Release/AU/Clonada.component dist/ 2>/dev/null || true
+          cp -r build/Clonada_artefacts/Release/Standalone/Clonada.app dist/ 2>/dev/null || true
+
+      - name: Package artifacts (Windows)
+        if: runner.os == 'Windows'
+        working-directory: plugin
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp -r build/Clonada_artefacts/Release/VST3/Clonada.vst3 dist/ 2>/dev/null || true
+          cp -r build/Clonada_artefacts/Release/Standalone/Clonada.exe dist/ 2>/dev/null || true
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: plugin/dist/
