@@ -36,6 +36,7 @@ else()
 
     if(ZMQ_FOUND)
         message(STATUS "Found ZeroMQ via pkg-config")
+        set(ZMQ_LIBRARIES PkgConfig::ZMQ)
     else()
         message(STATUS "Building ZeroMQ from source")
         set(ZMQ_BUILD_TESTS OFF CACHE BOOL "" FORCE)
