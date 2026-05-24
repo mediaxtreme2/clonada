@@ -19,7 +19,7 @@ jobs:
 
       - name: Sync to public worker repo
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN }}
         run: |
           git clone https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository_owner }}/clonada-worker.git worker
           cd worker
