@@ -7,3 +7,4 @@ demucs>=4.0.0
 transformers>=4.35.0
 runpod>=1.6.0
 scipy>=1.11.0
+faiss-cpu>=1.7.4
