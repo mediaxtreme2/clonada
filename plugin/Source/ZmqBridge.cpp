@@ -1,4 +1,10 @@
 #include "ZmqBridge.h"
+
+#if defined(_WIN32)
+#pragma comment(lib, "ws2_32.lib")
+#pragma comment(lib, "iphlpapi.lib")
+#endif
+
 #include <zmq.h>
 
 ZmqBridge::ZmqBridge() : juce::Thread("ZmqBridge") {

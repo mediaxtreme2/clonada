@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Clonada VERSION 1.0.0 LANGUAGES CXX)
+project(Clonada VERSION 1.0.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -16,35 +16,45 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(JUCE)
 
-# Fetch cppzmq (header-only ZeroMQ C++ bindings)
-find_package(PkgConfig QUIET)
-if(PkgConfig_FOUND)
-    pkg_check_modules(ZMQ libzmq)
-endif()
+# Find ZeroMQ - try system/vcpkg first, then build from source
+find_package(ZeroMQ CONFIG QUIET)
+if(ZeroMQ_FOUND OR TARGET libzmq)
+    message(STATUS "Found ZeroMQ via find_package")
+    if(TARGET libzmq)
+        set(ZMQ_LIBRARIES libzmq)
+    elseif(TARGET libzmq-static)
+        set(ZMQ_LIBRARIES libzmq-static)
+    else()
+        set(ZMQ_LIBRARIES ${ZeroMQ_LIBRARIES})
+    endif()
+    set(ZMQ_INCLUDE_DIRS ${ZeroMQ_INCLUDE_DIRS})
+else()
+    find_package(PkgConfig QUIET)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(ZMQ IMPORTED_TARGET libzmq)
+    endif()
 
-if(NOT ZMQ_FOUND)
-    # Fallback: build libzmq from source
-    FetchContent_Declare(
-        libzmq
-        GIT_REPOSITORY https://github.com/zeromq/libzmq.git
-        GIT_TAG v4.3.5
-        GIT_SHALLOW TRUE
-    )
-    set(ZMQ_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-    set(WITH_DOCS OFF CACHE BOOL "" FORCE)
-    FetchContent_MakeAvailable(libzmq)
-    set(ZMQ_LIBRARIES libzmq-static)
-    set(ZMQ_INCLUDE_DIRS ${libzmq_SOURCE_DIR}/include ${libzmq_BINARY_DIR})
+    if(ZMQ_FOUND)
+        message(STATUS "Found ZeroMQ via pkg-config")
+    else()
+        message(STATUS "Building ZeroMQ from source")
+        set(ZMQ_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+        set(WITH_DOCS OFF CACHE BOOL "" FORCE)
+        set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
+        set(BUILD_SHARED OFF CACHE BOOL "" FORCE)
+        set(BUILD_STATIC ON CACHE BOOL "" FORCE)
+        set(ENABLE_DRAFTS OFF CACHE BOOL "" FORCE)
+        FetchContent_Declare(
+            libzmq
+            GIT_REPOSITORY https://github.com/zeromq/libzmq.git
+            GIT_TAG v4.3.6
+            GIT_SHALLOW TRUE
+        )
+        FetchContent_MakeAvailable(libzmq)
+        set(ZMQ_LIBRARIES libzmq-static)
+        set(ZMQ_INCLUDE_DIRS ${libzmq_SOURCE_DIR}/include ${libzmq_BINARY_DIR})
+    endif()
 endif()
-
-FetchContent_Declare(
-    cppzmq
-    GIT_REPOSITORY https://github.com/zeromq/cppzmq.git
-    GIT_TAG v4.10.0
-    GIT_SHALLOW TRUE
-)
-set(CPPZMQ_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(cppzmq)
 
 juce_add_plugin(Clonada
     COMPANY_NAME "mediaXtreme"
@@ -80,7 +90,6 @@ target_compile_definitions(Clonada PUBLIC
 
 target_include_directories(Clonada PRIVATE
     ${ZMQ_INCLUDE_DIRS}
-    ${cppzmq_SOURCE_DIR}
 )
 
 target_link_libraries(Clonada

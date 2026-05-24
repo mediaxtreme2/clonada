@@ -17,10 +17,8 @@ jobs:
         include:
           - os: windows-latest
             artifact: clonada-windows
-            cmake_extra: -DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake
           - os: macos-14
             artifact: clonada-macos
-            cmake_extra: ""
 
     runs-on: ${{ matrix.os }}
 
@@ -40,19 +38,18 @@ jobs:
       - name: Configure CMake (macOS)
         if: runner.os == 'macOS'
         working-directory: plugin
-        run: |
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
 
       - name: Configure CMake (Windows)
         if: runner.os == 'Windows'
         working-directory: plugin
+        shell: pwsh
         run: |
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+          cmake -B build -DCMAKE_BUILD_TYPE=Release "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake"
 
       - name: Build
         working-directory: plugin
-        run: |
-          cmake --build build --config Release --parallel
+        run: cmake --build build --config Release --parallel
 
       - name: Package artifacts (macOS)
         if: runner.os == 'macOS'
