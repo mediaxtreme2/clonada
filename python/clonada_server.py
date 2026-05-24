@@ -21,6 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(__file__))
 from lib.pipeline import VoiceConversionPipeline
+from lib.license_client import validate, activate, deactivate, has_feature
 
 # ═══════════════════════════════════════════════════════════
 # GPU DETECTION
@@ -120,12 +121,16 @@ class ClonadaLocalEngine:
 
     VERSION = "1.0.0"
 
-    def __init__(self, port=5050, models_dir=None, weights_dir=None):
+    def __init__(self, port=5050, models_dir=None, weights_dir=None, license_key=None):
         self.port = port
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.REP)
         self.socket.bind(f"tcp://127.0.0.1:{port}")
         self.is_running = True
+
+        self.license_tier = None
+        self.license_features = []
+        self._validate_license(license_key)
 
         self.device = detect_device()
         self.pipeline = VoiceConversionPipeline(
@@ -143,8 +148,56 @@ class ClonadaLocalEngine:
         # Pre-load HuBERT if available
         self.pipeline.hubert.load()
 
+    def _validate_license(self, license_key=None):
+        """Check license on startup."""
+        if license_key:
+            ok, tier, features, err = activate(license_key)
+            if not ok:
+                ok, tier, features, err = validate(license_key)
+        else:
+            ok, tier, features, err = validate()
+
+        if ok:
+            self.license_tier = tier
+            self.license_features = features
+            print(f"[LICENSE] Valid - Tier: {tier}, Features: {', '.join(features)}")
+        else:
+            print(f"[LICENSE] WARNING: {err or 'No valid license'}")
+            print("[LICENSE] Running in demo mode (limited functionality)")
+            self.license_tier = "demo"
+            self.license_features = []
+
+    def _check_feature(self, feature):
+        """Check if current license allows a feature."""
+        if self.license_tier == "demo":
+            return False
+        return feature in self.license_features
+
+    def handle_activate(self, message):
+        """Activate license."""
+        key = message.get("license_key", "")
+        if not key:
+            return {"status": "ERROR", "message": "Missing license_key"}
+        ok, tier, features, err = activate(key)
+        if ok:
+            self.license_tier = tier
+            self.license_features = features
+            return {"status": "SUCCESS", "tier": tier, "features": features}
+        return {"status": "ERROR", "message": err}
+
+    def handle_deactivate(self, message):
+        """Deactivate license."""
+        ok, err = deactivate()
+        if ok:
+            self.license_tier = "demo"
+            self.license_features = []
+            return {"status": "SUCCESS"}
+        return {"status": "ERROR", "message": err}
+
     def handle_swap(self, message):
         """Process voice swap from raw audio data."""
+        if not self._check_feature("swap"):
+            return {"status": "ERROR", "message": "License required for voice swap. Activate with a valid license key."}
         try:
             audio_data = np.array(message["audio"], dtype=np.float32)
             model_path = message.get("model", "")
@@ -176,6 +229,8 @@ class ClonadaLocalEngine:
 
     def handle_swap_file(self, message):
         """Process voice swap from file path (efficient for large audio)."""
+        if not self._check_feature("swap"):
+            return {"status": "ERROR", "message": "License required for voice swap."}
         try:
             input_path = message["input"]
             output_path = message.get("output", input_path.replace(".wav", "_clonada.wav"))
@@ -214,6 +269,8 @@ class ClonadaLocalEngine:
 
     def handle_separate(self, message):
         """Process stem separation request."""
+        if not self._check_feature("separate"):
+            return {"status": "ERROR", "message": "License required for stem separation."}
         try:
             input_path = message["input"]
             output_dir = message.get("output_dir", os.path.dirname(input_path))
@@ -259,7 +316,9 @@ class ClonadaLocalEngine:
             "device": self.device,
             "gpu_available": self.device != "cpu",
             "models_dir": self.models_dir,
-            "port": self.port
+            "port": self.port,
+            "license_tier": self.license_tier,
+            "license_features": self.license_features,
         }
 
     def process_stream(self):
@@ -277,6 +336,8 @@ class ClonadaLocalEngine:
             "SEPARATE": self.handle_separate,
             "LIST_MODELS": self.handle_list_models,
             "HEALTH": self.handle_health,
+            "ACTIVATE": self.handle_activate,
+            "DEACTIVATE": self.handle_deactivate,
         }
 
         while self.is_running:
@@ -340,12 +401,14 @@ def main():
     parser.add_argument("--models-dir", type=str, default=None, help="Path to voice models directory")
     parser.add_argument("--weights-dir", type=str, default=None, help="Path to base weights directory")
     parser.add_argument("--device", type=str, default=None, choices=["cpu", "cuda", "mps"], help="Force device")
+    parser.add_argument("--license-key", type=str, default=None, help="License key to activate")
     args = parser.parse_args()
 
     engine = ClonadaLocalEngine(
         port=args.port,
         models_dir=args.models_dir,
-        weights_dir=args.weights_dir
+        weights_dir=args.weights_dir,
+        license_key=args.license_key
     )
 
     if args.device:
