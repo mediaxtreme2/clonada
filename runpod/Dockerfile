@@ -17,12 +17,18 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Pre-fetch HuBERT base model
-RUN mkdir -p /clonada_core/weights && \
-    wget -q https://huggingface.co/lj1995/VoiceConversionWebUI/resolve/main/hubert_base.pt \
-    -O /clonada_core/weights/hubert_base.pt
+# Copy inference pipeline (copied by CI before build)
+COPY python /clonada_core/python
 
-# Pre-fetch RVC v2 pretrained weights
+# Pre-fetch HuBERT via transformers cache
+RUN python3 -c "from transformers import HubertModel; HubertModel.from_pretrained('facebook/hubert-base-ls960')"
+
+# Pre-fetch RMVPE weights
+RUN mkdir -p /clonada_core/weights && \
+    wget -q https://huggingface.co/lj1995/VoiceConversionWebUI/resolve/main/rmvpe.pt \
+    -O /clonada_core/weights/rmvpe.pt
+
+# Pre-fetch RVC v2 pretrained weights for training
 RUN mkdir -p /clonada_core/weights/pretrained_v2 && \
     wget -q https://huggingface.co/lj1995/VoiceConversionWebUI/resolve/main/pretrained_v2/f0G40k.pth \
     -O /clonada_core/weights/pretrained_v2/f0G40k.pth && \

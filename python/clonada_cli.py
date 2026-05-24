@@ -182,20 +182,16 @@ def cmd_train(args):
 
 
 def cmd_activate(args):
-    """Validate license key against machine ID."""
-    machine_id = args.machine
-    license_key = args.key
-    secret_salt = "ClonadaV1_MediaXtreme_2026"
+    """Validate license key against license server."""
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "lib"))
+    from license_client import activate
 
-    # Generate token hash
-    token_input = f"{license_key}{machine_id}{secret_salt}"
-    token_hash = hashlib.sha256(token_input.encode()).hexdigest()
-
-    # TODO: Validate against licensing server
-    # For now, return the token for local storage
-    # In production: POST to https://license.clonada.com/verify.php
-
-    print(f"SUCCESS|TOKEN:{token_hash}|TIER:Basic")
+    ok, tier, features, err = activate(args.key)
+    if ok:
+        print(f"SUCCESS|TIER:{tier}|FEATURES:{','.join(features)}")
+    else:
+        print(f"ERROR|{err or 'Activation failed'}", file=sys.stderr)
+        sys.exit(1)
 
 
 def cmd_shutdown(args):
@@ -208,7 +204,9 @@ def cmd_health(args):
     """Check engine health."""
     response = send_command(args.port, {"version": "1.0.0", "command": "HEALTH"}, timeout=5000)
     if response.get("status") == "SUCCESS":
-        print(f"SUCCESS|device={response.get('device')}|gpu={response.get('gpu_available')}")
+        tier = response.get("license_tier", "demo")
+        features = ",".join(response.get("license_features", []))
+        print(f"SUCCESS|device={response.get('device')}|gpu={response.get('gpu_available')}|tier={tier}|features={features}")
     else:
         print(f"ERROR|{response.get('message', 'Engine not responding')}")
         sys.exit(1)
