@@ -113,10 +113,10 @@ void LicenseClient::activate(const juce::String& key, std::function<void(License
         .withPOSTData("{\"license_key\":\"" + key + "\",\"hardware_id\":\"" + hwId + "\",\"hmac\":\"" + hmac + "\"}");
 
     juce::Thread::launch([this, url, key, callback]() {
-        juce::URL::InputStreamOptions options{};
-        options = options.withHttpRequestCmd("POST")
-                        .withExtraHeaders("Content-Type: application/json");
-        auto stream = url.createInputStream(options);
+        auto stream = url.createInputStream(
+            juce::URL::InputStreamOptions(juce::URL::ParameterHandling::inPostData)
+                .withHttpRequestCmd("POST")
+                .withExtraHeaders("Content-Type: application/json"));
         LicenseInfo info;
         if (stream) {
             auto response = stream->readEntireStreamAsString();
@@ -152,10 +152,10 @@ void LicenseClient::validate(std::function<void(LicenseInfo)> callback) {
         .withPOSTData("{\"license_key\":\"" + key + "\",\"hardware_id\":\"" + hwId + "\",\"hmac\":\"" + hmac + "\"}");
 
     juce::Thread::launch([this, url, key, callback]() {
-        juce::URL::InputStreamOptions options{};
-        options = options.withHttpRequestCmd("POST")
-                        .withExtraHeaders("Content-Type: application/json");
-        auto stream = url.createInputStream(options);
+        auto stream = url.createInputStream(
+            juce::URL::InputStreamOptions(juce::URL::ParameterHandling::inPostData)
+                .withHttpRequestCmd("POST")
+                .withExtraHeaders("Content-Type: application/json"));
         LicenseInfo info;
         if (stream) {
             auto response = stream->readEntireStreamAsString();
@@ -181,10 +181,10 @@ void LicenseClient::deactivate(std::function<void(bool)> callback) {
         .withPOSTData("{\"license_key\":\"" + key + "\",\"hardware_id\":\"" + hwId + "\",\"hmac\":\"" + hmac + "\"}");
 
     juce::Thread::launch([this, url, callback]() {
-        juce::URL::InputStreamOptions options{};
-        options = options.withHttpRequestCmd("POST")
-                        .withExtraHeaders("Content-Type: application/json");
-        auto stream = url.createInputStream(options);
+        auto stream = url.createInputStream(
+            juce::URL::InputStreamOptions(juce::URL::ParameterHandling::inPostData)
+                .withHttpRequestCmd("POST")
+                .withExtraHeaders("Content-Type: application/json"));
         bool success = false;
         if (stream) {
             auto response = stream->readEntireStreamAsString();
