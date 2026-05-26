@@ -1,0 +1,147 @@
+name: Release Clonada
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 1.0.0)'
+        required: true
+        default: '1.0.0'
+
+jobs:
+  build-plugin:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-14]
+        include:
+          - os: windows-latest
+            platform: windows
+          - os: macos-14
+            platform: macos
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install pkg-config zeromq
+
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: vcpkg install zeromq:x64-windows-static-md
+
+      - name: Configure CMake (macOS)
+        if: runner.os == 'macOS'
+        working-directory: plugin
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Configure CMake (Windows)
+        if: runner.os == 'Windows'
+        working-directory: plugin
+        shell: pwsh
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows-static-md
+
+      - name: Build
+        working-directory: plugin
+        run: cmake --build build --config Release --parallel
+
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        working-directory: plugin
+        run: |
+          mkdir -p dist/Clonada
+          cp -r build/Clonada_artefacts/Release/VST3/Clonada.vst3 dist/Clonada/ 2>/dev/null || true
+          cp -r build/Clonada_artefacts/Release/AU/Clonada.component dist/Clonada/ 2>/dev/null || true
+          cp -r build/Clonada_artefacts/Release/CLAP/Clonada.clap dist/Clonada/ 2>/dev/null || true
+          cp -r build/Clonada_artefacts/Release/Standalone/Clonada.app dist/Clonada/ 2>/dev/null || true
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        working-directory: plugin
+        shell: bash
+        run: |
+          mkdir -p dist/Clonada
+          cp -r build/Clonada_artefacts/Release/VST3/Clonada.vst3 dist/Clonada/ 2>/dev/null || true
+          cp -r build/Clonada_artefacts/Release/CLAP/Clonada.clap dist/Clonada/ 2>/dev/null || true
+          cp -r build/Clonada_artefacts/Release/Standalone/Clonada.exe dist/Clonada/ 2>/dev/null || true
+
+      - name: Upload plugin artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: clonada-plugin-${{ matrix.platform }}
+          path: plugin/dist/Clonada/
+          retention-days: 30
+
+  package-release:
+    needs: build-plugin
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download macOS plugin
+        uses: actions/download-artifact@v4
+        with:
+          name: clonada-plugin-macos
+          path: release/macos/plugin/
+
+      - name: Download Windows plugin
+        uses: actions/download-artifact@v4
+        with:
+          name: clonada-plugin-windows
+          path: release/windows/plugin/
+
+      - name: Package macOS release
+        run: |
+          mkdir -p release/macos/engine release/macos/weights release/macos/models
+          cp -r python/* release/macos/engine/
+          cp installer/install_macos.sh release/macos/
+          chmod +x release/macos/install_macos.sh
+          echo "Clonada v${{ github.event.inputs.version }}" > release/macos/VERSION
+          cd release && tar -czf ../Clonada-${{ github.event.inputs.version }}-macOS.tar.gz macos/
+
+      - name: Package Windows release
+        run: |
+          mkdir -p release/windows/engine release/windows/weights release/windows/models
+          cp -r python/* release/windows/engine/
+          cp installer/install_windows.bat release/windows/
+          echo "Clonada v${{ github.event.inputs.version }}" > release/windows/VERSION
+          cd release && zip -r ../Clonada-${{ github.event.inputs.version }}-Windows.zip windows/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.event.inputs.version }}
+          name: Clonada v${{ github.event.inputs.version }}
+          body: |
+            ## Clonada AI Vocal Suite v${{ github.event.inputs.version }}
+
+            ### Plugin Formats
+            - VST3 (Windows, macOS)
+            - AU (macOS only)
+            - CLAP (Windows, macOS)
+            - Standalone (Windows, macOS)
+
+            ### Installation
+            1. Extract the archive for your platform
+            2. Run the installer script to set up the Python AI engine
+            3. Copy plugin files to your DAW's plugin folder
+            4. Launch your DAW and activate with your license key
+
+            ### Requirements
+            - Windows 10+ or macOS 12+ (Apple Silicon native)
+            - 8GB RAM minimum
+            - Internet connection for license activation and cloud training
+          files: |
+            Clonada-${{ github.event.inputs.version }}-macOS.tar.gz
+            Clonada-${{ github.event.inputs.version }}-Windows.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

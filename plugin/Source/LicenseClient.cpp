@@ -78,7 +78,7 @@ void LicenseClient::saveCachedLicense() {
     obj->setProperty("key", cachedInfo_.licenseKey);
     obj->setProperty("expires", cachedInfo_.expiresAt);
     obj->setProperty("tier", cachedInfo_.tier == Tier::Advanced ? "advanced" : cachedInfo_.tier == Tier::Basic ? "basic" : "none");
-    obj->setProperty("hardware_id", getHardwareId());
+    obj->setProperty("hardware_fingerprint", getHardwareId());
 
     file.replaceWithText(juce::JSON::toString(juce::var(obj)));
 }
@@ -109,8 +109,12 @@ void LicenseClient::activate(const juce::String& key, std::function<void(License
     auto payload = key + "|" + hwId;
     auto hmac = computeHmac(payload);
 
+    auto machineName = juce::SystemStats::getComputerName();
+    auto osInfo = juce::SystemStats::getOperatingSystemName();
     auto url = juce::URL(juce::String(kServerUrl) + "/activate")
-        .withPOSTData("{\"license_key\":\"" + key + "\",\"hardware_id\":\"" + hwId + "\",\"hmac\":\"" + hmac + "\"}");
+        .withPOSTData("{\"license_key\":\"" + key + "\",\"hardware_fingerprint\":\"" + hwId
+            + "\",\"machine_name\":\"" + machineName + "\",\"os_info\":\"" + osInfo
+            + "\",\"hmac\":\"" + hmac + "\"}");
 
     juce::Thread::launch([this, url, key, callback]() {
         auto stream = url.createInputStream(
@@ -149,7 +153,7 @@ void LicenseClient::validate(std::function<void(LicenseInfo)> callback) {
     auto key = cachedInfo_.licenseKey;
 
     auto url = juce::URL(juce::String(kServerUrl) + "/validate")
-        .withPOSTData("{\"license_key\":\"" + key + "\",\"hardware_id\":\"" + hwId + "\",\"hmac\":\"" + hmac + "\"}");
+        .withPOSTData("{\"license_key\":\"" + key + "\",\"hardware_fingerprint\":\"" + hwId + "\",\"hmac\":\"" + hmac + "\"}");
 
     juce::Thread::launch([this, url, key, callback]() {
         auto stream = url.createInputStream(
@@ -178,7 +182,7 @@ void LicenseClient::deactivate(std::function<void(bool)> callback) {
     auto key = cachedInfo_.licenseKey;
 
     auto url = juce::URL(juce::String(kServerUrl) + "/deactivate")
-        .withPOSTData("{\"license_key\":\"" + key + "\",\"hardware_id\":\"" + hwId + "\",\"hmac\":\"" + hmac + "\"}");
+        .withPOSTData("{\"license_key\":\"" + key + "\",\"hardware_fingerprint\":\"" + hwId + "\",\"hmac\":\"" + hmac + "\"}");
 
     juce::Thread::launch([this, url, callback]() {
         auto stream = url.createInputStream(
