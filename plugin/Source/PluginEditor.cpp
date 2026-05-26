@@ -73,16 +73,23 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
     browseButton_.setColour(juce::TextButton::buttonColourId, juce::Colour(kCyan).withAlpha(0.2f));
     browseButton_.setColour(juce::TextButton::textColourOffId, juce::Colour(kCyan));
     browseButton_.onClick = [this] {
-        auto chooser = std::make_shared<juce::FileChooser>("Select Models Folder",
-            processor_.getModelsDirectory(), "");
-        chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
-            [this, chooser](const juce::FileChooser& fc) {
-                auto result = fc.getResult();
-                if (result.isDirectory()) {
-                    processor_.setModelsDirectory(result);
-                    populateModelList();
-                }
-            });
+        showingModelBrowser_ = !showingModelBrowser_;
+        if (showingModelBrowser_) {
+            modelBrowser_ = std::make_unique<ModelBrowser>(processor_);
+            modelBrowser_->onModelSelected = [this] { populateModelList(); };
+            modelBrowser_->onClose = [this] {
+                showingModelBrowser_ = false;
+                modelBrowser_.reset();
+                populateModelList();
+                repaint();
+            };
+            addAndMakeVisible(*modelBrowser_);
+            modelBrowser_->setBounds(getLocalBounds().reduced(40, 60));
+        } else {
+            modelBrowser_.reset();
+            populateModelList();
+        }
+        repaint();
     };
     addAndMakeVisible(browseButton_);
 
@@ -381,6 +388,10 @@ void ClonadaEditor::resized() {
     // License panel overlay
     if (licensePanel_)
         licensePanel_->setBounds(getLocalBounds().reduced(160, 130));
+
+    // Model browser overlay
+    if (modelBrowser_)
+        modelBrowser_->setBounds(getLocalBounds().reduced(40, 60));
 }
 
 juce::AudioProcessorEditor* ClonadaProcessor::createEditor() {

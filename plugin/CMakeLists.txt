@@ -103,6 +103,7 @@ target_sources(Clonada PRIVATE
     Source/ClonadaLookAndFeel.cpp
     Source/WaveformDisplay.cpp
     Source/PresetManager.cpp
+    Source/ModelBrowser.cpp
 )
 
 target_compile_definitions(Clonada PUBLIC

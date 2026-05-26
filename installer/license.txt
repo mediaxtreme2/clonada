@@ -1,0 +1,31 @@
+CLONADA AI VOCAL SUITE - END USER LICENSE AGREEMENT
+
+Copyright (c) 2026 mediaXtreme LLC. All rights reserved.
+
+BY INSTALLING OR USING THIS SOFTWARE, YOU AGREE TO THE FOLLOWING TERMS:
+
+1. LICENSE GRANT
+   mediaXtreme LLC grants you a non-exclusive, non-transferable license to
+   use the Clonada software on machines authorized by your license key.
+
+2. RESTRICTIONS
+   You may not reverse-engineer, decompile, or disassemble this software.
+   You may not redistribute or sublicense this software without written
+   permission from mediaXtreme LLC.
+
+3. AI-GENERATED CONTENT
+   You retain ownership of audio content created using Clonada. You are
+   responsible for ensuring your use of voice cloning technology complies
+   with all applicable laws and regulations.
+
+4. DISCLAIMER OF WARRANTY
+   THIS SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND. IN NO
+   EVENT SHALL MEDIAXTREME LLC BE LIABLE FOR ANY DAMAGES ARISING FROM THE
+   USE OF THIS SOFTWARE.
+
+5. TERMINATION
+   This license is effective until terminated. Your rights under this
+   license will terminate automatically if you fail to comply with any
+   of its terms.
+
+For support, visit: https://github.com/anirudhatalmale6-alt/clonada

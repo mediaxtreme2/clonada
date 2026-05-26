@@ -5,6 +5,7 @@
 #include "ClonadaLookAndFeel.h"
 #include "WaveformDisplay.h"
 #include "PresetManager.h"
+#include "ModelBrowser.h"
 
 class ClonadaEditor : public juce::AudioProcessorEditor, private juce::Timer {
 public:
@@ -60,6 +61,10 @@ private:
     juce::TextButton licenseButton_{"License"};
     std::unique_ptr<LicensePanel> licensePanel_;
     bool showingLicense_ = false;
+
+    // Model browser overlay
+    std::unique_ptr<ModelBrowser> modelBrowser_;
+    bool showingModelBrowser_ = false;
 
     // Waveform (owned by processor, displayed here)
     WaveformDisplay& waveformDisplay_;
