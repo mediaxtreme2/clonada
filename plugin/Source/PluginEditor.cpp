@@ -126,6 +126,26 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
     bypassButton_.setColour(juce::ToggleButton::tickColourId, juce::Colour(kRed));
     addAndMakeVisible(bypassButton_);
 
+    // License button
+    licenseButton_.setColour(juce::TextButton::buttonColourId, juce::Colour(kPanel));
+    licenseButton_.setColour(juce::TextButton::textColourOffId, juce::Colour(kCyan));
+    licenseButton_.onClick = [this] {
+        showingLicense_ = !showingLicense_;
+        if (showingLicense_) {
+            licensePanel_ = std::make_unique<LicensePanel>(processor_.getLicenseClient());
+            licensePanel_->onLicenseActivated = [this] {
+                // Auto-launch engine after activation
+                processor_.launchEngine();
+            };
+            addAndMakeVisible(*licensePanel_);
+            licensePanel_->setBounds(getLocalBounds().reduced(100, 90));
+        } else {
+            licensePanel_.reset();
+        }
+        repaint();
+    };
+    addAndMakeVisible(licenseButton_);
+
     // Attachments
     pitchAttach_ = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processor_.getAPVTS(), ParamIDs::PITCH, pitchSlider_);
@@ -227,6 +247,7 @@ void ClonadaEditor::resized() {
     // Header
     auto header = area.removeFromTop(60).reduced(10);
     titleLabel_.setBounds(header.removeFromLeft(180).withTrimmedTop(10));
+    licenseButton_.setBounds(header.removeFromRight(70).withTrimmedTop(12).withHeight(24));
     statusLabel_.setBounds(header.withTrimmedTop(15));
 
     // Model row

@@ -4,6 +4,8 @@
 #include "RingBuffer.h"
 #include "ZmqBridge.h"
 #include "Parameters.h"
+#include "LicenseClient.h"
+#include "EngineLauncher.h"
 
 class ClonadaProcessor : public juce::AudioProcessor {
 public:
@@ -33,6 +35,11 @@ public:
 
     juce::AudioProcessorValueTreeState& getAPVTS() { return apvts_; }
     ZmqBridge& getBridge() { return bridge_; }
+    LicenseClient& getLicenseClient() { return licenseClient_; }
+    EngineLauncher& getEngineLauncher() { return engineLauncher_; }
+
+    bool launchEngine() { return engineLauncher_.launch(); }
+    bool isEngineLaunched() const { return engineLauncher_.isRunning(); }
 
     // Model management
     void setModelPath(const juce::String& path) { currentModelPath_ = path; }
@@ -48,6 +55,8 @@ public:
 private:
     juce::AudioProcessorValueTreeState apvts_;
     ZmqBridge bridge_;
+    LicenseClient licenseClient_;
+    EngineLauncher engineLauncher_;
 
     // Lock-free audio pipeline
     std::unique_ptr<LockFreeRingBuffer<float>> inputRing_;

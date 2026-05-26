@@ -58,6 +58,7 @@ jobs:
           mkdir -p dist
           cp -r build/Clonada_artefacts/Release/VST3/Clonada.vst3 dist/ 2>/dev/null || true
           cp -r build/Clonada_artefacts/Release/AU/Clonada.component dist/ 2>/dev/null || true
+          cp -r build/Clonada_artefacts/Release/CLAP/Clonada.clap dist/ 2>/dev/null || true
           cp -r build/Clonada_artefacts/Release/Standalone/Clonada.app dist/ 2>/dev/null || true
 
       - name: Package artifacts (Windows)
@@ -67,6 +68,7 @@ jobs:
         run: |
           mkdir -p dist
           cp -r build/Clonada_artefacts/Release/VST3/Clonada.vst3 dist/ 2>/dev/null || true
+          cp -r build/Clonada_artefacts/Release/CLAP/Clonada.clap dist/ 2>/dev/null || true
           cp -r build/Clonada_artefacts/Release/Standalone/Clonada.exe dist/ 2>/dev/null || true
 
       - name: Upload artifacts

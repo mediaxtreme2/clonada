@@ -7,11 +7,17 @@ ClonadaProcessor::ClonadaProcessor()
         .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       apvts_(*this, nullptr, "PARAMETERS", createParameterLayout()) {
 
+    // Try to auto-launch the Python engine sidecar
+    if (licenseClient_.isActivated()) {
+        engineLauncher_.launch();
+        juce::Thread::sleep(1000);
+    }
     bridge_.connect("tcp://127.0.0.1:5050");
 }
 
 ClonadaProcessor::~ClonadaProcessor() {
     bridge_.disconnect();
+    engineLauncher_.shutdown();
 }
 
 void ClonadaProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {

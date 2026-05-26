@@ -1,6 +1,7 @@
 #pragma once
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "PluginProcessor.h"
+#include "LicensePanel.h"
 
 class ClonadaEditor : public juce::AudioProcessorEditor, private juce::Timer {
 public:
@@ -43,6 +44,11 @@ private:
     juce::ComboBox modeSelector_;
     juce::ToggleButton bypassButton_{"Bypass"};
     juce::Label modeLabel_{"", "Mode:"};
+
+    // License
+    juce::TextButton licenseButton_{"License"};
+    std::unique_ptr<LicensePanel> licensePanel_;
+    bool showingLicense_ = false;
 
     // Metering
     float inputMeter_ = 0.0f;

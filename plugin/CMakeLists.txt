@@ -16,6 +16,15 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(JUCE)
 
+# Fetch clap-juce-extensions for CLAP format support
+FetchContent_Declare(
+    clap-juce-extensions
+    GIT_REPOSITORY https://github.com/free-audio/clap-juce-extensions.git
+    GIT_TAG main
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(clap-juce-extensions)
+
 # Find ZeroMQ - prefer static to avoid DLL dependency issues in plugins
 find_package(ZeroMQ CONFIG QUIET)
 if(ZeroMQ_FOUND OR TARGET libzmq-static OR TARGET libzmq)
@@ -74,12 +83,23 @@ juce_add_plugin(Clonada
     AU_MAIN_TYPE "kAudioUnitType_Effect"
 )
 
+# Enable CLAP format via clap-juce-extensions
+clap_juce_extensions_plugin(
+    TARGET Clonada
+    CLAP_ID "com.mediaxtreme.clonada"
+    CLAP_FEATURES "audio-effect" "voice" "pitch-shift"
+    CLAP_PROCESS_EVENTS_RESOLUTION_SAMPLES 64
+)
+
 target_sources(Clonada PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
     Source/RingBuffer.h
     Source/ZmqBridge.cpp
     Source/Parameters.h
+    Source/LicenseClient.cpp
+    Source/LicensePanel.cpp
+    Source/EngineLauncher.cpp
 )
 
 target_compile_definitions(Clonada PUBLIC
@@ -97,6 +117,7 @@ target_link_libraries(Clonada
     PRIVATE
         juce::juce_audio_utils
         juce::juce_dsp
+        juce::juce_cryptography
         ${ZMQ_LIBRARIES}
     PUBLIC
         juce::juce_recommended_config_flags
