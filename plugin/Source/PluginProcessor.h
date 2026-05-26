@@ -6,6 +6,7 @@
 #include "Parameters.h"
 #include "LicenseClient.h"
 #include "EngineLauncher.h"
+#include "WaveformDisplay.h"
 
 class ClonadaProcessor : public juce::AudioProcessor {
 public:
@@ -52,6 +53,8 @@ public:
     float getCurrentOutputLevel() const { return outputLevel_.load(); }
     bool isEngineConnected() const { return bridge_.getState() == ZmqBridge::ConnectionState::Connected; }
 
+    WaveformDisplay& getWaveformDisplay() { return waveformDisplay_; }
+
 private:
     juce::AudioProcessorValueTreeState apvts_;
     ZmqBridge bridge_;
@@ -80,6 +83,8 @@ private:
 
     juce::String currentModelPath_;
     juce::File modelsDir_;
+
+    WaveformDisplay waveformDisplay_;
 
     void updateLatency();
     void submitChunkForProcessing();

@@ -138,6 +138,14 @@ void ClonadaProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
     for (int ch = 0; ch < numChannels; ++ch)
         outLevel = std::max(outLevel, buffer.getMagnitude(ch, 0, numSamples));
     outputLevel_.store(outLevel);
+
+    // Feed waveform display (downsample to every 16th sample for visualization)
+    if (numChannels > 0) {
+        const float* inPtr = dryBuffer_.getReadPointer(0);
+        const float* outPtr = buffer.getReadPointer(0);
+        for (int i = 0; i < numSamples; i += 16)
+            waveformDisplay_.pushSample(inPtr[i], outPtr[i]);
+    }
 }
 
 void ClonadaProcessor::submitChunkForProcessing() {

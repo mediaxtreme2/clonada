@@ -100,6 +100,9 @@ target_sources(Clonada PRIVATE
     Source/LicenseClient.cpp
     Source/LicensePanel.cpp
     Source/EngineLauncher.cpp
+    Source/ClonadaLookAndFeel.cpp
+    Source/WaveformDisplay.cpp
+    Source/PresetManager.cpp
 )
 
 target_compile_definitions(Clonada PUBLIC
