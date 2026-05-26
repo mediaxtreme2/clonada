@@ -42,6 +42,12 @@ void ZmqBridge::submitSwapRequest(SwapRequest request) {
     requestPending_.store(true);
 }
 
+void ZmqBridge::submitLoadModel(const juce::String& modelPath) {
+    juce::ScopedLock lock(modelLock_);
+    pendingModelPath_ = modelPath;
+    modelLoadPending_.store(true);
+}
+
 ZmqBridge::SwapResponse ZmqBridge::consumeResponse() {
     juce::ScopedLock lock(responseLock_);
     responseReady_.store(false);
@@ -92,6 +98,38 @@ void ZmqBridge::run() {
 }
 
 void ZmqBridge::processQueue() {
+    // Handle model load requests first
+    if (modelLoadPending_.load()) {
+        juce::String modelPath;
+        {
+            juce::ScopedLock lock(modelLock_);
+            modelPath = pendingModelPath_;
+            modelLoadPending_.store(false);
+        }
+
+        juce::DynamicObject::Ptr obj = new juce::DynamicObject();
+        obj->setProperty("version", "1.0.0");
+        obj->setProperty("command", "LOAD_MODEL");
+        obj->setProperty("model_path", modelPath);
+
+        juce::String json = juce::JSON::toString(juce::var(obj.get()));
+        auto jsonUtf8 = json.toRawUTF8();
+
+        int sendRc = zmq_send(zmqSocket_, jsonUtf8, strlen(jsonUtf8), 0);
+        if (sendRc >= 0) {
+            char buf[4096];
+            int recvRc = zmq_recv(zmqSocket_, buf, sizeof(buf) - 1, 0);
+            if (recvRc > 0) {
+                buf[recvRc] = '\0';
+                juce::String resp(buf);
+                if (resp.contains("SUCCESS")) {
+                    modelLoaded_.store(true);
+                    loadedModelName_ = juce::File(modelPath).getFileNameWithoutExtension();
+                }
+            }
+        }
+    }
+
     if (!requestPending_.load()) return;
 
     SwapRequest req;

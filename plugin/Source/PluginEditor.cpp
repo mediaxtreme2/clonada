@@ -67,6 +67,15 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
     modelSelector_.setColour(juce::ComboBox::backgroundColourId, juce::Colour(kPanel));
     modelSelector_.setColour(juce::ComboBox::textColourId, juce::Colour(kTextLight));
     modelSelector_.setColour(juce::ComboBox::outlineColourId, juce::Colour(kCyan).withAlpha(0.3f));
+    modelSelector_.onChange = [this] {
+        int idx = modelSelector_.getSelectedId() - 1;
+        auto models = processor_.getAvailableModels();
+        if (idx >= 0 && idx < models.size()) {
+            auto modelFile = processor_.getModelsDirectory().getChildFile(models[idx] + ".pth");
+            processor_.setModelPath(modelFile.getFullPathName());
+            processor_.getBridge().submitLoadModel(modelFile.getFullPathName());
+        }
+    };
     addAndMakeVisible(modelSelector_);
     populateModelList();
 
@@ -202,9 +211,15 @@ void ClonadaEditor::timerCallback() {
 }
 
 void ClonadaEditor::updateConnectionStatus() {
+    auto& bridge = processor_.getBridge();
     if (processor_.isEngineConnected()) {
-        statusLabel_.setText("Engine Connected", juce::dontSendNotification);
-        statusLabel_.setColour(juce::Label::textColourId, juce::Colour(kGreen));
+        if (bridge.isModelLoaded()) {
+            statusLabel_.setText("Voice: " + bridge.getLoadedModelName(), juce::dontSendNotification);
+            statusLabel_.setColour(juce::Label::textColourId, juce::Colour(kCyan));
+        } else {
+            statusLabel_.setText("Engine Ready - Select Model", juce::dontSendNotification);
+            statusLabel_.setColour(juce::Label::textColourId, juce::Colour(kGreen));
+        }
     } else {
         statusLabel_.setText("Engine Offline", juce::dontSendNotification);
         statusLabel_.setColour(juce::Label::textColourId, juce::Colour(kRed));

@@ -32,8 +32,12 @@ public:
     ConnectionState getState() const { return state_.load(); }
 
     void submitSwapRequest(SwapRequest request);
+    void submitLoadModel(const juce::String& modelPath);
     bool hasResponse() const { return responseReady_.load(); }
     SwapResponse consumeResponse();
+
+    bool isModelLoaded() const { return modelLoaded_.load(); }
+    juce::String getLoadedModelName() const { return loadedModelName_; }
 
     void setOnConnectionChanged(std::function<void(ConnectionState)> cb) { onConnectionChanged_ = std::move(cb); }
 
@@ -45,10 +49,15 @@ private:
     std::atomic<ConnectionState> state_{ConnectionState::Disconnected};
     std::atomic<bool> responseReady_{false};
     std::atomic<bool> requestPending_{false};
+    std::atomic<bool> modelLoadPending_{false};
+    std::atomic<bool> modelLoaded_{false};
 
     juce::String endpoint_;
     SwapRequest pendingRequest_;
     SwapResponse lastResponse_;
+    juce::String pendingModelPath_;
+    juce::String loadedModelName_;
+    juce::CriticalSection modelLock_;
 
     juce::CriticalSection requestLock_;
     juce::CriticalSection responseLock_;
