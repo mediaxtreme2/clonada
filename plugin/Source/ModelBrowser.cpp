@@ -74,7 +74,7 @@ ModelBrowser::ModelBrowser(ClonadaProcessor& p) : processor_(p) {
             "Select Training Audio (WAV/MP3)", juce::File(), "*.wav;*.mp3;*.flac");
         chooser->launchAsync(
             juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-            [this, chooser](const juce::FileChooser& fc) {
+            [chooser](const juce::FileChooser& fc) {
                 auto result = fc.getResult();
                 if (!result.existsAsFile()) return;
 
@@ -170,7 +170,7 @@ void ModelBrowser::paintListBoxItem(int row, juce::Graphics& g, int w, int h, bo
         g.fillRect(0, 0, w, h);
     }
 
-    auto& model = models_[row];
+    auto model = models_[row];
 
     // Model name
     g.setColour(juce::Colour(ClonadaLookAndFeel::kTextLight));
