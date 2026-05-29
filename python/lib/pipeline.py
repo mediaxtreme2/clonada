@@ -104,13 +104,30 @@ class RMVPEPitchExtractor:
         self.model_path = model_path
         self.model = None
 
+    def _auto_download(self):
+        """Download RMVPE weights from HuggingFace if missing."""
+        if os.path.exists(self.model_path):
+            return True
+        os.makedirs(os.path.dirname(self.model_path), exist_ok=True)
+        url = "https://huggingface.co/lj1995/VoiceConversionWebUI/resolve/main/rmvpe.pt"
+        print(f"[INFO] Downloading RMVPE weights (~173MB)...")
+        try:
+            import urllib.request
+            urllib.request.urlretrieve(url, self.model_path)
+            print(f"[OK] RMVPE downloaded to {self.model_path}")
+            return True
+        except Exception as e:
+            print(f"[ERROR] RMVPE download failed: {e}")
+            return False
+
     def load(self):
         if self.model is not None:
             return True
 
         if not os.path.exists(self.model_path):
-            print(f"[WARN] RMVPE weights not found: {self.model_path}")
-            return False
+            if not self._auto_download():
+                print(f"[WARN] RMVPE weights not found: {self.model_path}")
+                return False
 
         try:
             from .rmvpe import RMVPE

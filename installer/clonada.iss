@@ -2,7 +2,9 @@
 ; Packages VST3/CLAP plugin + Python engine sidecar
 
 #define AppName "Clonada"
-#define AppVersion "1.0.0"
+#ifndef AppVersion
+  #define AppVersion "1.0.0"
+#endif
 #define AppPublisher "mediaXtreme LLC"
 #define AppURL "https://github.com/anirudhatalmale6-alt/clonada"
 
@@ -15,14 +17,12 @@ AppPublisherURL={#AppURL}
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 OutputBaseFilename=Clonada-{#AppVersion}-Windows-Setup
-SetupIconFile=..\plugin\Resources\clonada.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=admin
-UninstallDisplayIcon={app}\clonada.ico
 LicenseFile=license.txt
 
 [Languages]
@@ -39,21 +39,21 @@ Name: "vst3"; Description: "VST3 Plugin"; Types: full plugin custom; Flags: fixe
 Name: "clap"; Description: "CLAP Plugin"; Types: full custom
 Name: "standalone"; Description: "Standalone Application"; Types: full custom
 Name: "engine"; Description: "AI Engine (Python sidecar)"; Types: full custom
-Name: "models"; Description: "Base voice models"; Types: full custom
 
 [Files]
 ; VST3 plugin
-Source: "..\build\Clonada_artefacts\Release\VST3\Clonada.vst3\*"; DestDir: "{commoncf64}\VST3\Clonada.vst3"; Components: vst3; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\plugin\build\Clonada_artefacts\Release\VST3\Clonada.vst3\*"; DestDir: "{commoncf64}\VST3\Clonada.vst3"; Components: vst3; Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; CLAP plugin
-Source: "..\build\Clonada_artefacts\Release\CLAP\Clonada.clap"; DestDir: "{commoncf64}\CLAP"; Components: clap; Flags: ignoreversion
+Source: "..\plugin\build\Clonada_artefacts\Release\CLAP\Clonada.clap"; DestDir: "{commoncf64}\CLAP"; Components: clap; Flags: ignoreversion
 
 ; Standalone
-Source: "..\build\Clonada_artefacts\Release\Standalone\Clonada.exe"; DestDir: "{app}"; Components: standalone; Flags: ignoreversion
+Source: "..\plugin\build\Clonada_artefacts\Release\Standalone\Clonada.exe"; DestDir: "{app}"; Components: standalone; Flags: ignoreversion
 
-; Engine files
-Source: "..\python\*"; DestDir: "{app}\engine"; Components: engine; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\weights\*"; DestDir: "{app}\weights"; Components: models; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.pth"
+; Engine files (Python sidecar)
+Source: "..\python\*.py"; DestDir: "{app}\engine"; Components: engine; Flags: ignoreversion
+Source: "..\python\requirements.txt"; DestDir: "{app}\engine"; Components: engine; Flags: ignoreversion
+Source: "..\python\lib\*.py"; DestDir: "{app}\engine\lib"; Components: engine; Flags: ignoreversion
 
 ; Launcher scripts
 Source: "install_windows.bat"; DestDir: "{app}"; Components: engine; Flags: ignoreversion
@@ -65,7 +65,6 @@ Name: "{group}\Setup AI Engine"; Filename: "{app}\install_windows.bat"; Componen
 Name: "{group}\Uninstall Clonada"; Filename: "{uninstallexe}"
 
 [Registry]
-; Register VST3 path for DAW scanning
 Root: HKLM; Subkey: "SOFTWARE\mediaXtreme\Clonada"; ValueType: string; ValueName: "InstallDir"; ValueData: "{app}"; Flags: uninsdeletekey
 Root: HKLM; Subkey: "SOFTWARE\mediaXtreme\Clonada"; ValueType: string; ValueName: "Version"; ValueData: "{#AppVersion}"
 

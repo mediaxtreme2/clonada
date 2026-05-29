@@ -53,22 +53,35 @@ jobs:
       - name: Create macOS DMG
         if: runner.os == 'macOS'
         run: |
-          mkdir -p dist/Clonada
+          mkdir -p dist/Clonada/python/lib
+
+          # Copy plugin binaries
           cp -r plugin/build/Clonada_artefacts/Release/VST3/Clonada.vst3 dist/Clonada/ 2>/dev/null || true
           cp -r plugin/build/Clonada_artefacts/Release/AU/Clonada.component dist/Clonada/ 2>/dev/null || true
           cp -r plugin/build/Clonada_artefacts/Release/CLAP/Clonada.clap dist/Clonada/ 2>/dev/null || true
           cp -r plugin/build/Clonada_artefacts/Release/Standalone/Clonada.app dist/Clonada/ 2>/dev/null || true
+
+          # Copy Python engine
+          cp python/*.py dist/Clonada/python/
+          cp python/requirements.txt dist/Clonada/python/
+          cp python/lib/*.py dist/Clonada/python/lib/
+
+          # Copy installer assets
           cp installer/license.txt dist/Clonada/
           cp installer/install_macos.sh dist/Clonada/
           chmod +x dist/Clonada/install_macos.sh
 
           cat > dist/Clonada/README.txt << 'EOF'
           CLONADA AI VOCAL SUITE v${{ github.event.inputs.version }}
-          Double-click "Install Clonada.command" to install plugins.
-          Run install_macos.sh to set up the AI engine.
+
+          1. Double-click "Install Clonada.command" to install plugin files
+          2. Run install_macos.sh to set up the Python AI engine
+          3. Open your DAW and rescan plugins
+          4. Activate with your license key on first launch
+
+          Models download automatically on first use (~200MB).
           EOF
 
-          # Create install command script
           cat > "dist/Clonada/Install Clonada.command" << 'INSTALLEOF'
           #!/bin/bash
           SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -80,11 +93,19 @@ jobs:
           [ -d "$SCRIPT_DIR/Clonada.component" ] && cp -R "$SCRIPT_DIR/Clonada.component" "$HOME/Library/Audio/Plug-Ins/Components/"
           [ -f "$SCRIPT_DIR/Clonada.clap" ] && cp "$SCRIPT_DIR/Clonada.clap" "$HOME/Library/Audio/Plug-Ins/CLAP/"
           [ -d "$SCRIPT_DIR/Clonada.app" ] && cp -R "$SCRIPT_DIR/Clonada.app" /Applications/
-          echo "Done! Rescan plugins in your DAW."
+
+          # Copy Python engine to install directory
+          INSTALL_DIR="$HOME/Clonada"
+          mkdir -p "$INSTALL_DIR"
+          cp -R "$SCRIPT_DIR/python" "$INSTALL_DIR/"
+
+          echo ""
+          echo "Plugins installed! Rescan in your DAW."
+          echo "Now run: bash $INSTALL_DIR/install_macos.sh"
+          echo "to set up the AI engine."
           INSTALLEOF
           chmod +x "dist/Clonada/Install Clonada.command"
 
-          # Create DMG
           hdiutil create -volname "Clonada" -srcfolder dist/Clonada -ov -format UDZO \
             "Clonada-${{ github.event.inputs.version }}-macOS.dmg"
 
@@ -103,7 +124,6 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          # Inno Setup is pre-installed on windows-latest runners
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion="${{ github.event.inputs.version }}" installer\clonada.iss
           Move-Item installer\Output\*.exe "Clonada-${{ github.event.inputs.version }}-Windows-Setup.exe"
 
@@ -182,15 +202,18 @@ jobs:
             - **Standalone** — Windows, macOS
 
             ### Installation
-            **Windows:** Run the `.exe` installer. It copies VST3/CLAP to standard plugin folders.
-            **macOS:** Open the `.dmg` and double-click "Install Clonada.command".
+            **Windows:** Run the `.exe` installer. It copies VST3/CLAP to standard plugin folders and includes the AI engine setup.
+            **macOS:** Open the `.dmg` and double-click "Install Clonada.command", then run `install_macos.sh` to set up the AI engine.
 
-            After installing the plugin, run the engine setup script to configure the Python AI sidecar.
+            After installing, activate with your license key on first plugin launch. AI models (~200MB) download automatically on first use.
+
+            ### License Keys
+            Each license supports up to 5 device activations. Keys are platform-independent — one key works on both Windows and macOS.
 
             ### Requirements
             - Windows 10+ (64-bit) or macOS 12+ (Apple Silicon native)
             - 8 GB RAM minimum
-            - Internet connection for license activation and cloud training
+            - Internet connection for license activation, model download, and cloud training
           files: |
             release/Clonada-${{ github.event.inputs.version }}-macOS.dmg
             release/Clonada-${{ github.event.inputs.version }}-Windows-Setup.exe
