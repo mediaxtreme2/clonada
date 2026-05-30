@@ -3,7 +3,7 @@
 
 #define AppName "Clonada"
 #ifndef AppVersion
-  #define AppVersion "1.0.0"
+  #define AppVersion "1.2.0"
 #endif
 #define AppPublisher "mediaXtreme LLC"
 #define AppURL "https://github.com/anirudhatalmale6-alt/clonada"
@@ -69,7 +69,7 @@ Root: HKLM; Subkey: "SOFTWARE\mediaXtreme\Clonada"; ValueType: string; ValueName
 Root: HKLM; Subkey: "SOFTWARE\mediaXtreme\Clonada"; ValueType: string; ValueName: "Version"; ValueData: "{#AppVersion}"
 
 [Run]
-Filename: "{app}\install_windows.bat"; Description: "Setup AI Engine (installs Python environment)"; Components: engine; Flags: postinstall nowait skipifsilent shellexec
+Filename: "{app}\install_windows.bat"; Description: "Setup AI Engine now (recommended — takes 5-15 min)"; Components: engine; Flags: postinstall shellexec
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\engine"

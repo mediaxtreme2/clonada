@@ -4,9 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g., 1.0.0)'
+        description: 'Release version (e.g., 1.2.0)'
         required: true
-        default: '1.0.0'
+        default: '1.2.0'
+
+permissions:
+  contents: write
 
 jobs:
   build-plugin:
@@ -72,7 +75,7 @@ jobs:
           echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> $GITHUB_ENV
           echo "SIGNING_IDENTITY=Developer ID Application: mediaXtreme LLC (DBJC3A73UV)" >> $GITHUB_ENV
 
-      - name: Create macOS DMG
+      - name: Create macOS DMG with unified installer
         if: runner.os == 'macOS'
         run: |
           mkdir -p dist/Clonada/python/lib
@@ -88,45 +91,52 @@ jobs:
           cp python/requirements.txt dist/Clonada/python/
           cp python/lib/*.py dist/Clonada/python/lib/
 
-          # Copy installer assets
-          cp installer/license.txt dist/Clonada/
+          # Copy unified installer (this IS the single-step installer)
           cp installer/install_macos.sh dist/Clonada/
           chmod +x dist/Clonada/install_macos.sh
 
-          cat > dist/Clonada/README.txt << 'EOF'
-          CLONADA AI VOCAL SUITE v${{ github.event.inputs.version }}
+          # Copy license
+          cp installer/license.txt dist/Clonada/
 
-          1. Double-click "Install Clonada.command" to install plugin files
-          2. Run install_macos.sh to set up the Python AI engine
-          3. Open your DAW and rescan plugins
-          4. Activate with your license key on first launch
-
-          Models download automatically on first use (~200MB).
-          EOF
-
-          cat > "dist/Clonada/Install Clonada.command" << 'INSTALLEOF'
+          # Create the .command wrapper that users double-click in Finder
+          cat > "dist/Clonada/Install Clonada.command" << 'CMDEOF'
           #!/bin/bash
+          # Wrapper so users can double-click in Finder
           SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-          echo "Installing Clonada plugins..."
-          mkdir -p "$HOME/Library/Audio/Plug-Ins/VST3"
-          mkdir -p "$HOME/Library/Audio/Plug-Ins/Components"
-          mkdir -p "$HOME/Library/Audio/Plug-Ins/CLAP"
-          [ -d "$SCRIPT_DIR/Clonada.vst3" ] && cp -R "$SCRIPT_DIR/Clonada.vst3" "$HOME/Library/Audio/Plug-Ins/VST3/"
-          [ -d "$SCRIPT_DIR/Clonada.component" ] && cp -R "$SCRIPT_DIR/Clonada.component" "$HOME/Library/Audio/Plug-Ins/Components/"
-          [ -f "$SCRIPT_DIR/Clonada.clap" ] && cp "$SCRIPT_DIR/Clonada.clap" "$HOME/Library/Audio/Plug-Ins/CLAP/"
-          [ -d "$SCRIPT_DIR/Clonada.app" ] && cp -R "$SCRIPT_DIR/Clonada.app" /Applications/
-
-          # Copy Python engine to install directory
-          INSTALL_DIR="$HOME/Clonada"
-          mkdir -p "$INSTALL_DIR"
-          cp -R "$SCRIPT_DIR/python" "$INSTALL_DIR/"
-
+          cd "$SCRIPT_DIR"
+          bash "$SCRIPT_DIR/install_macos.sh"
           echo ""
-          echo "Plugins installed! Rescan in your DAW."
-          echo "Now run: bash $INSTALL_DIR/install_macos.sh"
-          echo "to set up the AI engine."
-          INSTALLEOF
+          echo "You can close this window now."
+          read -n 1 -s -r -p "Press any key to exit..."
+          CMDEOF
           chmod +x "dist/Clonada/Install Clonada.command"
+
+          cat > dist/Clonada/README.txt << EOF
+          CLONADA AI VOCAL SUITE v${{ github.event.inputs.version }}
+          ============================================
+
+          ONE-STEP INSTALL:
+            Double-click "Install Clonada.command"
+
+          That's it! The installer will:
+            1. Copy plugins (VST3, AU, CLAP) to your DAW folders
+            2. Install the standalone app to Applications
+            3. Set up the Python AI engine automatically
+            4. Create all necessary directories
+
+          After installation:
+            1. Open your DAW and rescan plugins
+            2. Load Clonada on a vocal track
+            3. Enter your license key
+            4. AI models download automatically on first use (~200 MB)
+
+          To uninstall: bash ~/Clonada/uninstall.sh
+
+          Requirements:
+            - macOS 12+ (Apple Silicon native support)
+            - 8 GB RAM minimum
+            - Internet connection for setup and model downloads
+          EOF
 
           # Code sign all binaries
           if [ -n "$SIGNING_IDENTITY" ]; then
@@ -206,6 +216,8 @@ jobs:
   create-release:
     needs: build-plugin
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
@@ -241,6 +253,10 @@ jobs:
           body: |
             ## Clonada AI Vocal Suite v${{ github.event.inputs.version }}
 
+            ### What's New
+            - **Single-step installer** — macOS users now just double-click "Install Clonada.command" and everything sets up automatically (plugins + AI engine)
+            - Apple code-signed binaries (no Gatekeeper warnings)
+
             ### Downloads
             | Platform | Installer | Manual |
             |----------|-----------|--------|
@@ -254,8 +270,9 @@ jobs:
             - **Standalone** — Windows, macOS
 
             ### Installation
-            **Windows:** Run the `.exe` installer. It copies VST3/CLAP to standard plugin folders and includes the AI engine setup.
-            **macOS:** Open the `.dmg` and double-click "Install Clonada.command", then run `install_macos.sh` to set up the AI engine.
+            **macOS:** Open the `.dmg`, double-click "Install Clonada.command" — that's it! Plugins, standalone app, and AI engine all set up in one step. Takes 5-15 minutes for the AI engine download.
+
+            **Windows:** Run the `.exe` installer. Select "Full installation" to include the AI engine, or "Plugin only" for just the VST3/CLAP files.
 
             After installing, activate with your license key on first plugin launch. AI models (~200MB) download automatically on first use.
 
