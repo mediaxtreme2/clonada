@@ -27,7 +27,7 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
     statusLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextGrey));
     addAndMakeVisible(statusLabel_);
 
-    versionLabel_.setText("v1.3.0", juce::dontSendNotification);
+    versionLabel_.setText("v1.4.0", juce::dontSendNotification);
     versionLabel_.setFont(juce::FontOptions(10.0f));
     versionLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextDark));
     addAndMakeVisible(versionLabel_);
@@ -241,10 +241,56 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
     engineInfoLabel_.setFont(juce::FontOptions(11.0f));
     addAndMakeVisible(engineInfoLabel_);
 
-    buildInfoLabel_.setText("Clonada AI Vocal Suite v1.3.0\nmediaXtreme LLC", juce::dontSendNotification);
+    buildInfoLabel_.setText("Clonada AI Vocal Suite v1.4.0\nmediaXtreme LLC", juce::dontSendNotification);
     buildInfoLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextDark));
     buildInfoLabel_.setFont(juce::FontOptions(10.0f));
     addAndMakeVisible(buildInfoLabel_);
+
+    // ── RunPod Cloud GPU ──
+    runpodSectionLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kCyanGlow));
+    runpodSectionLabel_.setFont(juce::FontOptions(12.0f, juce::Font::bold));
+    addAndMakeVisible(runpodSectionLabel_);
+
+    runpodKeyLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextGrey));
+    runpodKeyLabel_.setFont(juce::FontOptions(10.0f));
+    addAndMakeVisible(runpodKeyLabel_);
+
+    runpodKeyInput_.setFont(juce::FontOptions(12.0f));
+    runpodKeyInput_.setTextToShowWhenEmpty("rpa_XXXXXXXXXXXXXXXXXXXXXXXX", juce::Colour(LnF::kTextDark));
+    runpodKeyInput_.setColour(juce::TextEditor::backgroundColourId, juce::Colour(LnF::kSlatePanel));
+    runpodKeyInput_.setColour(juce::TextEditor::textColourId, juce::Colour(LnF::kTextWhite));
+    runpodKeyInput_.setColour(juce::TextEditor::outlineColourId, juce::Colour(LnF::kBorder));
+    runpodKeyInput_.setColour(juce::TextEditor::focusedOutlineColourId, juce::Colour(LnF::kCyanGlow));
+    runpodKeyInput_.setPasswordCharacter(0x2022);
+    auto savedKey = processor_.getRunPodApiKey();
+    if (savedKey.isNotEmpty())
+        runpodKeyInput_.setText(savedKey, juce::dontSendNotification);
+    addAndMakeVisible(runpodKeyInput_);
+
+    runpodSaveButton_.setColour(juce::TextButton::buttonColourId, juce::Colour(LnF::kCyanGlow).withAlpha(0.15f));
+    runpodSaveButton_.setColour(juce::TextButton::textColourOffId, juce::Colour(LnF::kCyanGlow));
+    runpodSaveButton_.onClick = [this] {
+        auto key = runpodKeyInput_.getText().trim();
+        processor_.setRunPodApiKey(key);
+        if (key.isNotEmpty()) {
+            runpodStatusLabel_.setText("Key saved", juce::dontSendNotification);
+            runpodStatusLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kGreen));
+        } else {
+            runpodStatusLabel_.setText("Key cleared", juce::dontSendNotification);
+            runpodStatusLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextDim));
+        }
+    };
+    addAndMakeVisible(runpodSaveButton_);
+
+    runpodStatusLabel_.setFont(juce::FontOptions(10.0f));
+    runpodStatusLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextDim));
+    if (savedKey.isNotEmpty()) {
+        runpodStatusLabel_.setText("Key configured", juce::dontSendNotification);
+        runpodStatusLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kGreen));
+    } else {
+        runpodStatusLabel_.setText("Not configured", juce::dontSendNotification);
+    }
+    addAndMakeVisible(runpodStatusLabel_);
 
     // ── Group components by tab ──
     modelingComponents_ = {
@@ -259,7 +305,9 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
         &inputGainLabel_, &outputGainLabel_, &bypassButton_
     };
     settingsComponents_ = {
-        &licenseButton_, &engineInfoLabel_, &buildInfoLabel_
+        &licenseButton_, &engineInfoLabel_, &buildInfoLabel_,
+        &runpodSectionLabel_, &runpodKeyLabel_, &runpodKeyInput_,
+        &runpodSaveButton_, &runpodStatusLabel_
     };
 
     // ── APVTS Attachments ──
@@ -582,12 +630,25 @@ void ClonadaEditor::resized() {
 
     } else if (activeTab_ == 2) {
         // ── Settings ──
-        content.removeFromTop(20);
-        licenseButton_.setBounds(content.removeFromTop(36).reduced(content.getWidth() / 4, 0));
-        content.removeFromTop(20);
-        engineInfoLabel_.setBounds(content.removeFromTop(60).reduced(20, 0));
-        content.removeFromTop(20);
-        buildInfoLabel_.setBounds(content.removeFromTop(40).reduced(20, 0));
+        content.removeFromTop(12);
+        licenseButton_.setBounds(content.removeFromTop(32).reduced(content.getWidth() / 4, 0));
+        content.removeFromTop(14);
+
+        // RunPod Cloud GPU section
+        runpodSectionLabel_.setBounds(content.removeFromTop(20).reduced(20, 0));
+        content.removeFromTop(6);
+        auto rpRow = content.removeFromTop(28).reduced(20, 0);
+        runpodKeyLabel_.setBounds(rpRow.removeFromLeft(54).withTrimmedTop(4));
+        runpodSaveButton_.setBounds(rpRow.removeFromRight(72).withHeight(26).withTrimmedTop(1));
+        rpRow.removeFromRight(6);
+        runpodKeyInput_.setBounds(rpRow.withHeight(26).withTrimmedTop(1));
+        content.removeFromTop(4);
+        runpodStatusLabel_.setBounds(content.removeFromTop(16).reduced(74, 0));
+
+        content.removeFromTop(14);
+        engineInfoLabel_.setBounds(content.removeFromTop(52).reduced(20, 0));
+        content.removeFromTop(10);
+        buildInfoLabel_.setBounds(content.removeFromTop(36).reduced(20, 0));
     }
 
     // Overlays

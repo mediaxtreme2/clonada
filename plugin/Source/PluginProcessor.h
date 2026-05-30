@@ -53,6 +53,9 @@ public:
     float getCurrentOutputLevel() const { return outputLevel_.load(); }
     bool isEngineConnected() const { return bridge_.getState() == ZmqBridge::ConnectionState::Connected; }
 
+    void setRunPodApiKey(const juce::String& key) { runpodApiKey_ = key; }
+    juce::String getRunPodApiKey() const { return runpodApiKey_; }
+
     WaveformDisplay& getWaveformDisplay() { return waveformDisplay_; }
 
 private:
@@ -83,6 +86,7 @@ private:
 
     juce::String currentModelPath_;
     juce::File modelsDir_;
+    juce::String runpodApiKey_;
 
     WaveformDisplay waveformDisplay_;
 

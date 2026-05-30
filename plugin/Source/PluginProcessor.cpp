@@ -186,6 +186,7 @@ void ClonadaProcessor::getStateInformation(juce::MemoryBlock& destData) {
     auto state = apvts_.copyState();
     state.setProperty("modelPath", currentModelPath_, nullptr);
     state.setProperty("modelsDir", modelsDir_.getFullPathName(), nullptr);
+    state.setProperty("runpodApiKey", runpodApiKey_, nullptr);
     std::unique_ptr<juce::XmlElement> xml(state.createXml());
     copyXmlToBinary(*xml, destData);
 }
@@ -199,6 +200,7 @@ void ClonadaProcessor::setStateInformation(const void* data, int sizeInBytes) {
         juce::String dirPath = state.getProperty("modelsDir", "").toString();
         if (dirPath.isNotEmpty())
             modelsDir_ = juce::File(dirPath);
+        runpodApiKey_ = state.getProperty("runpodApiKey", "").toString();
     }
 }
 

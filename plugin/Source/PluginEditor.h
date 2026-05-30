@@ -80,6 +80,13 @@ private:
     juce::Label engineInfoLabel_;
     juce::Label buildInfoLabel_;
 
+    // RunPod Cloud GPU
+    juce::Label runpodSectionLabel_{"", "CLOUD GPU (RunPod)"};
+    juce::Label runpodKeyLabel_{"", "API Key:"};
+    juce::TextEditor runpodKeyInput_;
+    juce::TextButton runpodSaveButton_{"Save Key"};
+    juce::Label runpodStatusLabel_;
+
     // Overlays
     std::unique_ptr<LicensePanel> licensePanel_;
     bool showingLicense_ = false;
