@@ -24,8 +24,9 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=admin
 LicenseFile=license.txt
-SetupIconFile=
+SetupIconFile=clonada.ico
 UninstallDisplayName=Clonada AI Vocal Suite
+UninstallDisplayIcon={app}\clonada.ico
 WizardImageStretch=no
 
 [Languages]
@@ -58,15 +59,20 @@ Source: "..\python\*.py"; DestDir: "{app}\engine"; Components: engine; Flags: ig
 Source: "..\python\requirements.txt"; DestDir: "{app}\engine"; Components: engine; Flags: ignoreversion
 Source: "..\python\lib\*.py"; DestDir: "{app}\engine\lib"; Components: engine; Flags: ignoreversion
 
-; Installer scripts
+; Installer scripts and assets
 Source: "install_windows.bat"; DestDir: "{app}"; Components: engine; Flags: ignoreversion
 Source: "license.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "clonada.ico"; DestDir: "{app}"; Flags: ignoreversion
+
+[Tasks]
+Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: checked
 
 [Icons]
-Name: "{group}\Clonada Standalone"; Filename: "{app}\Clonada.exe"; Components: standalone
-Name: "{group}\Clonada AI Engine"; Filename: "{userappdata}\..\Clonada\start_engine.bat"; Components: engine
-Name: "{group}\Activate License"; Filename: "{userappdata}\..\Clonada\activate_license.bat"; Components: engine
+Name: "{group}\Clonada Standalone"; Filename: "{app}\Clonada.exe"; IconFilename: "{app}\clonada.ico"; Components: standalone
+Name: "{group}\Clonada AI Engine"; Filename: "{userappdata}\..\Clonada\start_engine.bat"; IconFilename: "{app}\clonada.ico"; Components: engine
+Name: "{group}\Activate License"; Filename: "{userappdata}\..\Clonada\activate_license.bat"; IconFilename: "{app}\clonada.ico"; Components: engine
 Name: "{group}\Uninstall Clonada"; Filename: "{uninstallexe}"
+Name: "{autodesktop}\Clonada"; Filename: "{app}\Clonada.exe"; IconFilename: "{app}\clonada.ico"; Components: standalone; Tasks: desktopicon
 
 [Registry]
 Root: HKLM; Subkey: "SOFTWARE\mediaXtreme\Clonada"; ValueType: string; ValueName: "InstallDir"; ValueData: "{app}"; Flags: uninsdeletekey
