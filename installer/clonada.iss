@@ -1,5 +1,5 @@
 ; Clonada AI Vocal Suite - Inno Setup Script
-; Packages VST3/CLAP plugin + Python engine sidecar
+; Single-step installer: plugins + standalone + AI engine
 
 #define AppName "Clonada"
 #ifndef AppVersion
@@ -24,21 +24,24 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=admin
 LicenseFile=license.txt
+SetupIconFile=
+UninstallDisplayName=Clonada AI Vocal Suite
+WizardImageStretch=no
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
 
 [Types]
-Name: "full"; Description: "Full installation (Plugin + Engine)"
-Name: "plugin"; Description: "Plugin only (VST3/CLAP)"
+Name: "full"; Description: "Full installation (Plugin + Standalone + AI Engine) — Recommended"
+Name: "plugin"; Description: "Plugin only (VST3/CLAP, no AI engine)"
 Name: "custom"; Description: "Custom installation"; Flags: iscustom
 
 [Components]
 Name: "vst3"; Description: "VST3 Plugin"; Types: full plugin custom; Flags: fixed
-Name: "clap"; Description: "CLAP Plugin"; Types: full custom
+Name: "clap"; Description: "CLAP Plugin"; Types: full plugin custom
 Name: "standalone"; Description: "Standalone Application"; Types: full custom
-Name: "engine"; Description: "AI Engine (Python sidecar)"; Types: full custom
+Name: "engine"; Description: "AI Engine (voice cloning, stem separation)"; Types: full custom
 
 [Files]
 ; VST3 plugin
@@ -55,13 +58,14 @@ Source: "..\python\*.py"; DestDir: "{app}\engine"; Components: engine; Flags: ig
 Source: "..\python\requirements.txt"; DestDir: "{app}\engine"; Components: engine; Flags: ignoreversion
 Source: "..\python\lib\*.py"; DestDir: "{app}\engine\lib"; Components: engine; Flags: ignoreversion
 
-; Launcher scripts
+; Installer scripts
 Source: "install_windows.bat"; DestDir: "{app}"; Components: engine; Flags: ignoreversion
 Source: "license.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\Clonada Standalone"; Filename: "{app}\Clonada.exe"; Components: standalone
-Name: "{group}\Setup AI Engine"; Filename: "{app}\install_windows.bat"; Components: engine
+Name: "{group}\Clonada AI Engine"; Filename: "{userappdata}\..\Clonada\start_engine.bat"; Components: engine
+Name: "{group}\Activate License"; Filename: "{userappdata}\..\Clonada\activate_license.bat"; Components: engine
 Name: "{group}\Uninstall Clonada"; Filename: "{uninstallexe}"
 
 [Registry]
@@ -69,12 +73,15 @@ Root: HKLM; Subkey: "SOFTWARE\mediaXtreme\Clonada"; ValueType: string; ValueName
 Root: HKLM; Subkey: "SOFTWARE\mediaXtreme\Clonada"; ValueType: string; ValueName: "Version"; ValueData: "{#AppVersion}"
 
 [Run]
-Filename: "{app}\install_windows.bat"; Description: "Setup AI Engine now (recommended — takes 5-15 min)"; Components: engine; Flags: postinstall shellexec
+; Auto-run AI engine setup after install (passes install dir as argument)
+Filename: "{app}\install_windows.bat"; Parameters: """{app}"""; Description: "Setup AI Engine now (recommended — downloads ~2 GB, takes 5-15 min)"; Components: engine; Flags: postinstall shellexec
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\engine"
-Type: filesandordirs; Name: "{app}\weights"
-Type: filesandordirs; Name: "{app}\models"
+
+[UninstallRun]
+; Clean up Clonada home directory on uninstall
+Filename: "cmd.exe"; Parameters: "/c rd /s /q ""%USERPROFILE%\Clonada"""; Flags: runhidden
 
 [Code]
 function NextButtonClick(CurPageID: Integer): Boolean;
