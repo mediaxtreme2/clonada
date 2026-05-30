@@ -65,7 +65,7 @@ Source: "license.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "clonada.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Tasks]
-Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: checked
+Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"
 
 [Icons]
 Name: "{group}\Clonada Standalone"; Filename: "{app}\Clonada.exe"; IconFilename: "{app}\clonada.ico"; Components: standalone
