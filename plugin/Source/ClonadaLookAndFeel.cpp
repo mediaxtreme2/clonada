@@ -1,11 +1,11 @@
 #include "ClonadaLookAndFeel.h"
 
 ClonadaLookAndFeel::ClonadaLookAndFeel() {
-    setColour(juce::ResizableWindow::backgroundColourId, juce::Colour(kBgDark));
-    setColour(juce::PopupMenu::backgroundColourId, juce::Colour(kPanel));
-    setColour(juce::PopupMenu::textColourId, juce::Colour(kTextLight));
-    setColour(juce::PopupMenu::highlightedBackgroundColourId, juce::Colour(kIndigo));
-    setColour(juce::PopupMenu::highlightedTextColourId, juce::Colour(kTextLight));
+    setColour(juce::ResizableWindow::backgroundColourId, juce::Colour(kObsidian));
+    setColour(juce::PopupMenu::backgroundColourId, juce::Colour(kSlatePanel));
+    setColour(juce::PopupMenu::textColourId, juce::Colour(kTextWhite));
+    setColour(juce::PopupMenu::highlightedBackgroundColourId, juce::Colour(kCyanGlow).withAlpha(0.2f));
+    setColour(juce::PopupMenu::highlightedTextColourId, juce::Colour(kCyanGlow));
 }
 
 void ClonadaLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int w, int h,
@@ -20,18 +20,25 @@ void ClonadaLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int w
     auto rw = radius * 2.0f;
     auto angle = startAngle + sliderPos * (endAngle - startAngle);
 
-    // Outer shadow
-    g.setColour(juce::Colours::black.withAlpha(0.4f));
-    g.fillEllipse(rx + 2.0f, ry + 2.0f, rw, rw);
+    // Outer cyan glow halo
+    auto fillColour = slider.findColour(juce::Slider::rotarySliderFillColourId);
+    if (sliderPos > 0.01f) {
+        g.setColour(fillColour.withAlpha(0.06f));
+        g.fillEllipse(rx - 4.0f, ry - 4.0f, rw + 8.0f, rw + 8.0f);
+    }
 
-    // Knob body - dark gradient
-    juce::ColourGradient bodyGrad(juce::Colour(0xFF2a2a3e), centreX, ry,
-                                   juce::Colour(0xFF14141e), centreX, ry + rw, false);
+    // Outer shadow
+    g.setColour(juce::Colours::black.withAlpha(0.5f));
+    g.fillEllipse(rx + 1.5f, ry + 1.5f, rw, rw);
+
+    // Knob body - obsidian gradient
+    juce::ColourGradient bodyGrad(juce::Colour(0xFF222222), centreX, ry,
+                                   juce::Colour(0xFF0E0E0E), centreX, ry + rw, false);
     g.setGradientFill(bodyGrad);
     g.fillEllipse(rx, ry, rw, rw);
 
-    // Subtle rim highlight
-    g.setColour(juce::Colour(0xFF3a3a50));
+    // Subtle rim
+    g.setColour(juce::Colour(kBorder));
     g.drawEllipse(rx, ry, rw, rw, 1.0f);
 
     // Track arc (background)
@@ -43,13 +50,10 @@ void ClonadaLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int w
     g.strokePath(trackArc, juce::PathStrokeType(3.0f, juce::PathStrokeType::curved,
                                                   juce::PathStrokeType::rounded));
 
-    // Value arc (colored)
+    // Value arc
     if (sliderPos > 0.0f) {
         juce::Path valueArc;
 
-        auto fillColour = slider.findColour(juce::Slider::rotarySliderFillColourId);
-
-        // For bipolar knobs (pitch/formant), draw from center
         bool bipolar = slider.getMinimum() < 0 && slider.getMaximum() > 0;
         float arcStart = bipolar ? (startAngle + endAngle) * 0.5f : startAngle;
         float arcEnd = angle;
@@ -58,8 +62,8 @@ void ClonadaLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int w
         valueArc.addCentredArc(centreX, centreY, trackRadius, trackRadius,
                                0.0f, arcStart, arcEnd, true);
 
-        // Glow effect
-        g.setColour(fillColour.withAlpha(0.15f));
+        // Glow layer
+        g.setColour(fillColour.withAlpha(0.2f));
         g.strokePath(valueArc, juce::PathStrokeType(7.0f, juce::PathStrokeType::curved,
                                                       juce::PathStrokeType::rounded));
         g.setColour(fillColour);
@@ -80,7 +84,7 @@ void ClonadaLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int w
     g.fillPath(pointer);
 
     // Center dot
-    g.setColour(juce::Colour(0xFF3a3a50));
+    g.setColour(juce::Colour(kBorder));
     g.fillEllipse(centreX - 3.0f, centreY - 3.0f, 6.0f, 6.0f);
 }
 
@@ -115,7 +119,7 @@ void ClonadaLookAndFeel::drawLinearSlider(juce::Graphics& g, int x, int y, int w
 
         // Thumb
         auto thumbSize = 12.0f;
-        g.setColour(juce::Colour(kTextLight));
+        g.setColour(juce::Colour(kTextWhite));
         g.fillRoundedRectangle(centreX - thumbSize * 0.5f, sliderPos - 3.0f,
                                 thumbSize, 6.0f, 3.0f);
         g.setColour(fillColour);
@@ -132,16 +136,16 @@ void ClonadaLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& b
 
     auto baseColour = bg;
     if (down)
-        baseColour = baseColour.brighter(0.1f);
+        baseColour = baseColour.brighter(0.15f);
     else if (highlighted)
-        baseColour = baseColour.brighter(0.05f);
+        baseColour = baseColour.brighter(0.07f);
 
     g.setColour(baseColour);
     g.fillRoundedRectangle(bounds, cornerSize);
 
-    // Subtle top highlight
-    g.setColour(juce::Colours::white.withAlpha(0.05f));
-    g.fillRoundedRectangle(bounds.removeFromTop(bounds.getHeight() * 0.5f), cornerSize);
+    // Subtle border
+    g.setColour(juce::Colour(kBorder));
+    g.drawRoundedRectangle(bounds, cornerSize, 0.5f);
 }
 
 void ClonadaLookAndFeel::drawComboBox(juce::Graphics& g, int w, int h, bool down,
@@ -162,7 +166,7 @@ void ClonadaLookAndFeel::drawComboBox(juce::Graphics& g, int w, int h, bool down
     arrow.addTriangle(arrowZone.getX(), arrowZone.getY(),
                       arrowZone.getCentreX(), arrowZone.getBottom(),
                       arrowZone.getRight(), arrowZone.getY());
-    g.setColour(juce::Colour(kTextDim));
+    g.setColour(juce::Colour(kTextGrey));
     g.fillPath(arrow);
 }
 
@@ -171,20 +175,17 @@ void ClonadaLookAndFeel::drawToggleButton(juce::Graphics& g, juce::ToggleButton&
     auto bounds = button.getLocalBounds().toFloat();
     auto toggleArea = bounds.removeFromLeft(bounds.getHeight()).reduced(4.0f);
 
-    // Toggle track
     auto trackBounds = toggleArea.reduced(2.0f);
     auto isOn = button.getToggleState();
 
     g.setColour(isOn ? juce::Colour(kRed).withAlpha(0.3f) : juce::Colour(kKnobTrack));
     g.fillRoundedRectangle(trackBounds, trackBounds.getHeight() * 0.5f);
 
-    // Toggle thumb
     auto thumbSize = trackBounds.getHeight() - 4.0f;
     auto thumbX = isOn ? trackBounds.getRight() - thumbSize - 2.0f : trackBounds.getX() + 2.0f;
-    g.setColour(isOn ? juce::Colour(kRed) : juce::Colour(kTextDim));
+    g.setColour(isOn ? juce::Colour(kRed) : juce::Colour(kTextGrey));
     g.fillEllipse(thumbX, trackBounds.getCentreY() - thumbSize * 0.5f, thumbSize, thumbSize);
 
-    // Label
     g.setColour(button.findColour(juce::ToggleButton::textColourId));
     g.setFont(juce::FontOptions(12.0f));
     g.drawText(button.getButtonText(), bounds.reduced(4.0f, 0.0f), juce::Justification::centredLeft);

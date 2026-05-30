@@ -19,8 +19,8 @@ private:
     std::array<float, kBufferSize> outputBuffer_{};
     std::atomic<int> writePos_{0};
 
-    juce::Colour inputColour_{0xFF6366f1};
-    juce::Colour outputColour_{0xFF06b6d4};
+    juce::Colour inputColour_{0xFF00F2FF};
+    juce::Colour outputColour_{0xFF00B8C4};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(WaveformDisplay)
 };

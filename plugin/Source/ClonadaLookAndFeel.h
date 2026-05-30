@@ -25,21 +25,27 @@ public:
     juce::Font getComboBoxFont(juce::ComboBox&) override;
     juce::Font getTextButtonFont(juce::TextButton&, int buttonHeight) override;
 
-    static constexpr juce::uint32 kBgDark       = 0xFF08080a;
-    static constexpr juce::uint32 kBgMid        = 0xFF0e0e14;
-    static constexpr juce::uint32 kPanel         = 0xFF161626;
-    static constexpr juce::uint32 kPanelLight    = 0xFF1e1e36;
-    static constexpr juce::uint32 kIndigo        = 0xFF6366f1;
-    static constexpr juce::uint32 kIndigoGlow    = 0xFF818cf8;
-    static constexpr juce::uint32 kCyan          = 0xFF06b6d4;
-    static constexpr juce::uint32 kCyanGlow      = 0xFF22d3ee;
-    static constexpr juce::uint32 kTextLight     = 0xFFe2e8f0;
-    static constexpr juce::uint32 kTextDim       = 0xFF64748b;
-    static constexpr juce::uint32 kTextMuted     = 0xFF475569;
+    // Obsidian + Cyan color palette
+    static constexpr juce::uint32 kObsidian     = 0xFF0E0E0E;
+    static constexpr juce::uint32 kSlatePanel    = 0xFF161616;
+    static constexpr juce::uint32 kSlateLighter  = 0xFF1C1C1C;
+    static constexpr juce::uint32 kBorder        = 0xFF262626;
+    static constexpr juce::uint32 kCyanGlow      = 0xFF00F2FF;
+    static constexpr juce::uint32 kCyanDim       = 0xFF00B8C4;
+    static constexpr juce::uint32 kCyanSubtle    = 0xFF005F66;
+    static constexpr juce::uint32 kTextWhite     = 0xFFFFFFFF;
+    static constexpr juce::uint32 kTextGrey      = 0xFF888888;
+    static constexpr juce::uint32 kTextDark      = 0xFF555555;
     static constexpr juce::uint32 kGreen         = 0xFF22c55e;
     static constexpr juce::uint32 kRed           = 0xFFef4444;
     static constexpr juce::uint32 kAmber         = 0xFFf59e0b;
-    static constexpr juce::uint32 kKnobTrack     = 0xFF1e293b;
+    static constexpr juce::uint32 kKnobTrack     = 0xFF2A2A2A;
+
+    // Legacy aliases for components that reference old names
+    static constexpr juce::uint32 kBgDark    = kObsidian;
+    static constexpr juce::uint32 kPanel     = kSlatePanel;
+    static constexpr juce::uint32 kTextLight = kTextWhite;
+    static constexpr juce::uint32 kTextDim   = kTextGrey;
 
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ClonadaLookAndFeel)

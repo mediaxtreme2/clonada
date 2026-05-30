@@ -3,9 +3,9 @@
 LicensePanel::LicensePanel(LicenseClient& client) : client_(client) {
     setSize(400, 300);
 
-    titleLabel_.setText("CLONADA LICENSE", juce::dontSendNotification);
+    titleLabel_.setText(juce::CharPointer_UTF8("CLON\xce\x9bD\xce\x9b LICENSE"), juce::dontSendNotification);
     titleLabel_.setFont(juce::FontOptions(20.0f, juce::Font::bold));
-    titleLabel_.setColour(juce::Label::textColourId, juce::Colour(kIndigo));
+    titleLabel_.setColour(juce::Label::textColourId, juce::Colour(kCyan));
     titleLabel_.setJustificationType(juce::Justification::centred);
     addAndMakeVisible(titleLabel_);
 
@@ -27,13 +27,13 @@ LicensePanel::LicensePanel(LicenseClient& client) : client_(client) {
     keyInput_.setTextToShowWhenEmpty("CLON-XXXX-XXXX-XXXX-XXXX", juce::Colour(kTextDim));
     keyInput_.setColour(juce::TextEditor::backgroundColourId, juce::Colour(kPanel));
     keyInput_.setColour(juce::TextEditor::textColourId, juce::Colour(kTextLight));
-    keyInput_.setColour(juce::TextEditor::outlineColourId, juce::Colour(kIndigo).withAlpha(0.5f));
-    keyInput_.setColour(juce::TextEditor::focusedOutlineColourId, juce::Colour(kIndigo));
+    keyInput_.setColour(juce::TextEditor::outlineColourId, juce::Colour(kCyan).withAlpha(0.3f));
+    keyInput_.setColour(juce::TextEditor::focusedOutlineColourId, juce::Colour(kCyan));
     keyInput_.setJustification(juce::Justification::centred);
     addAndMakeVisible(keyInput_);
 
-    activateButton_.setColour(juce::TextButton::buttonColourId, juce::Colour(kIndigo));
-    activateButton_.setColour(juce::TextButton::textColourOffId, juce::Colour(kTextLight));
+    activateButton_.setColour(juce::TextButton::buttonColourId, juce::Colour(kCyan));
+    activateButton_.setColour(juce::TextButton::textColourOffId, juce::Colour(kBgDark));
     activateButton_.onClick = [this] { attemptActivation(); };
     addAndMakeVisible(activateButton_);
 
@@ -54,7 +54,7 @@ void LicensePanel::paint(juce::Graphics& g) {
     g.fillAll(juce::Colour(kBgDark));
     g.setColour(juce::Colour(kPanel));
     g.fillRoundedRectangle(getLocalBounds().toFloat().reduced(10.0f), 12.0f);
-    g.setColour(juce::Colour(kIndigo).withAlpha(0.3f));
+    g.setColour(juce::Colour(kCyan).withAlpha(0.2f));
     g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(10.0f), 12.0f, 1.5f);
 }
 

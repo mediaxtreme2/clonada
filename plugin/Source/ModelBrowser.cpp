@@ -4,7 +4,7 @@
 
 ModelBrowser::ModelBrowser(ClonadaProcessor& p) : processor_(p) {
     titleLabel_.setFont(juce::FontOptions(16.0f, juce::Font::bold));
-    titleLabel_.setColour(juce::Label::textColourId, juce::Colour(ClonadaLookAndFeel::kCyan));
+    titleLabel_.setColour(juce::Label::textColourId, juce::Colour(ClonadaLookAndFeel::kCyanGlow));
     titleLabel_.setJustificationType(juce::Justification::centredLeft);
     addAndMakeVisible(titleLabel_);
 
@@ -14,7 +14,7 @@ ModelBrowser::ModelBrowser(ClonadaProcessor& p) : processor_(p) {
     addAndMakeVisible(closeButton_);
 
     modelList_.setColour(juce::ListBox::backgroundColourId, juce::Colour(0xFF0c0c14));
-    modelList_.setColour(juce::ListBox::outlineColourId, juce::Colour(ClonadaLookAndFeel::kPanelLight));
+    modelList_.setColour(juce::ListBox::outlineColourId, juce::Colour(ClonadaLookAndFeel::kBorder));
     modelList_.setRowHeight(36);
     addAndMakeVisible(modelList_);
 
@@ -28,7 +28,7 @@ ModelBrowser::ModelBrowser(ClonadaProcessor& p) : processor_(p) {
         btn.setColour(juce::TextButton::textColourOffId, juce::Colour(col));
     };
 
-    setupButton(browseButton_, ClonadaLookAndFeel::kIndigo);
+    setupButton(browseButton_, ClonadaLookAndFeel::kCyanGlow);
     browseButton_.onClick = [this] {
         auto chooser = std::make_shared<juce::FileChooser>(
             "Select Models Folder", processor_.getModelsDirectory(), "");
@@ -44,7 +44,7 @@ ModelBrowser::ModelBrowser(ClonadaProcessor& p) : processor_(p) {
     };
     addAndMakeVisible(browseButton_);
 
-    setupButton(importButton_, ClonadaLookAndFeel::kCyan);
+    setupButton(importButton_, ClonadaLookAndFeel::kCyanDim);
     importButton_.onClick = [this] {
         auto chooser = std::make_shared<juce::FileChooser>(
             "Import Voice Model", juce::File(), "*.pth");
@@ -166,7 +166,7 @@ void ModelBrowser::paintListBoxItem(int row, juce::Graphics& g, int w, int h, bo
     if (row < 0 || row >= models_.size()) return;
 
     if (selected) {
-        g.setColour(juce::Colour(ClonadaLookAndFeel::kIndigo).withAlpha(0.2f));
+        g.setColour(juce::Colour(ClonadaLookAndFeel::kCyanGlow).withAlpha(0.15f));
         g.fillRect(0, 0, w, h);
     }
 
@@ -183,7 +183,7 @@ void ModelBrowser::paintListBoxItem(int row, juce::Graphics& g, int w, int h, bo
     g.drawText(formatFileSize(model.sizeBytes), w - 90, 0, 80, h, juce::Justification::centredRight);
 
     // Separator
-    g.setColour(juce::Colour(ClonadaLookAndFeel::kPanelLight).withAlpha(0.3f));
+    g.setColour(juce::Colour(ClonadaLookAndFeel::kBorder).withAlpha(0.3f));
     g.drawHorizontalLine(h - 1, 8.0f, (float)w - 8.0f);
 }
 
@@ -204,13 +204,13 @@ void ModelBrowser::paint(juce::Graphics& g) {
     g.fillRoundedRectangle(bounds, 10.0f);
 
     // Border
-    auto borderCol = dragHovering_ ? juce::Colour(ClonadaLookAndFeel::kCyan)
-                                   : juce::Colour(ClonadaLookAndFeel::kIndigo).withAlpha(0.3f);
+    auto borderCol = dragHovering_ ? juce::Colour(ClonadaLookAndFeel::kCyanGlow)
+                                   : juce::Colour(ClonadaLookAndFeel::kBorder);
     g.setColour(borderCol);
     g.drawRoundedRectangle(bounds.reduced(0.5f), 10.0f, dragHovering_ ? 2.0f : 1.0f);
 
     if (dragHovering_) {
-        g.setColour(juce::Colour(ClonadaLookAndFeel::kCyan).withAlpha(0.05f));
+        g.setColour(juce::Colour(ClonadaLookAndFeel::kCyanGlow).withAlpha(0.05f));
         g.fillRoundedRectangle(bounds.reduced(2.0f), 9.0f);
     }
 }
