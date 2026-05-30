@@ -171,7 +171,7 @@ void ClonadaLookAndFeel::drawComboBox(juce::Graphics& g, int w, int h, bool down
 }
 
 void ClonadaLookAndFeel::drawToggleButton(juce::Graphics& g, juce::ToggleButton& button,
-                                            bool highlighted, bool down) {
+                                            bool /*highlighted*/, bool /*down*/) {
     auto bounds = button.getLocalBounds().toFloat();
     auto toggleArea = bounds.removeFromLeft(bounds.getHeight()).reduced(4.0f);
 

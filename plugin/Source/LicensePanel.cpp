@@ -3,7 +3,7 @@
 LicensePanel::LicensePanel(LicenseClient& client) : client_(client) {
     setSize(400, 300);
 
-    titleLabel_.setText(juce::CharPointer_UTF8("CLON\xce\x9bD\xce\x9b LICENSE"), juce::dontSendNotification);
+    titleLabel_.setText(juce::String::fromUTF8("CLON\xce\x9b" "D" "\xce\x9b" " LICENSE"), juce::dontSendNotification);
     titleLabel_.setFont(juce::FontOptions(20.0f, juce::Font::bold));
     titleLabel_.setColour(juce::Label::textColourId, juce::Colour(kCyan));
     titleLabel_.setJustificationType(juce::Justification::centred);

@@ -12,7 +12,7 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
     setResizable(false, false);
 
     // ── Header ──
-    titleLabel_.setText(juce::CharPointer_UTF8("CLON\xce\x9bD\xce\x9b"), juce::dontSendNotification);
+    titleLabel_.setText(juce::String::fromUTF8("CLON\xce\x9b" "D" "\xce\x9b"), juce::dontSendNotification);
     titleLabel_.setFont(juce::FontOptions(22.0f, juce::Font::bold));
     titleLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kCyanGlow));
     addAndMakeVisible(titleLabel_);
@@ -139,7 +139,7 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
     pitchTrackerLabel_.setFont(juce::FontOptions(9.0f, juce::Font::bold));
     addAndMakeVisible(pitchTrackerLabel_);
 
-    auto setupRadio = [this](juce::ToggleButton& btn, int groupId) {
+    auto setupRadio = [this](juce::ToggleButton& btn, int /*groupId*/) {
         btn.setRadioGroupId(1001);
         btn.setColour(juce::ToggleButton::textColourId, juce::Colour(LnF::kTextWhite));
         btn.setColour(juce::ToggleButton::tickColourId, juce::Colour(LnF::kCyanGlow));
