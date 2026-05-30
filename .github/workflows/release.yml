@@ -50,6 +50,28 @@ jobs:
         working-directory: plugin
         run: cmake --build build --config Release --parallel
 
+      - name: Import Apple signing certificate
+        if: runner.os == 'macOS'
+        env:
+          APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          CERT_PATH=$RUNNER_TEMP/certificate.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/signing.keychain-db
+          KEYCHAIN_PASS="temp_keychain_$(date +%s)"
+
+          echo "$APPLE_CERTIFICATE_P12" | base64 --decode > "$CERT_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASS" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASS" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASS" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain
+
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> $GITHUB_ENV
+          echo "SIGNING_IDENTITY=Developer ID Application: mediaXtreme LLC (DBJC3A73UV)" >> $GITHUB_ENV
+
       - name: Create macOS DMG
         if: runner.os == 'macOS'
         run: |
@@ -106,8 +128,31 @@ jobs:
           INSTALLEOF
           chmod +x "dist/Clonada/Install Clonada.command"
 
+          # Code sign all binaries
+          if [ -n "$SIGNING_IDENTITY" ]; then
+            echo "Signing with: $SIGNING_IDENTITY"
+            for target in \
+              "dist/Clonada/Clonada.vst3" \
+              "dist/Clonada/Clonada.component" \
+              "dist/Clonada/Clonada.clap" \
+              "dist/Clonada/Clonada.app"; do
+              if [ -e "$target" ]; then
+                codesign --force --deep --sign "$SIGNING_IDENTITY" \
+                  --options runtime --timestamp "$target"
+                echo "Signed: $target"
+              fi
+            done
+          fi
+
           hdiutil create -volname "Clonada" -srcfolder dist/Clonada -ov -format UDZO \
             "Clonada-${{ github.event.inputs.version }}-macOS.dmg"
+
+          # Sign the DMG itself
+          if [ -n "$SIGNING_IDENTITY" ]; then
+            codesign --force --sign "$SIGNING_IDENTITY" --timestamp \
+              "Clonada-${{ github.event.inputs.version }}-macOS.dmg"
+            echo "Signed DMG"
+          fi
 
       - name: Create Windows installer package
         if: runner.os == 'Windows'
@@ -126,6 +171,13 @@ jobs:
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion="${{ github.event.inputs.version }}" installer\clonada.iss
           Move-Item installer\Output\*.exe "Clonada-${{ github.event.inputs.version }}-Windows-Setup.exe"
+
+      - name: Cleanup keychain
+        if: runner.os == 'macOS' && always()
+        run: |
+          if [ -f "$KEYCHAIN_PATH" ]; then
+            security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
+          fi
 
       - name: Upload macOS DMG
         if: runner.os == 'macOS'
