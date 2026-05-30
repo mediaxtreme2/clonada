@@ -36,23 +36,29 @@ else
     rm miniconda_installer.sh
 fi
 
+ENV_DIR="$CONDA_DIR/envs/$ENV_NAME"
+
 echo "[4/6] Creating Python environment..."
-"$CONDA_DIR/bin/conda" create -n "$ENV_NAME" python="$PYTHON_VER" -y 2>/dev/null || true
+if [ -d "$ENV_DIR" ]; then
+    echo "[OK] Environment already exists"
+else
+    "$CONDA_DIR/bin/conda" create -p "$ENV_DIR" python="$PYTHON_VER" -y
+fi
 
 echo "[5/6] Installing dependencies..."
-source "$CONDA_DIR/bin/activate" "$ENV_NAME"
+export PATH="$ENV_DIR/bin:$CONDA_DIR/bin:$PATH"
 
 # Install PyTorch (MPS for Apple Silicon, CPU for Intel)
 ARCH=$(uname -m)
 if [ "$ARCH" = "arm64" ]; then
-    pip install torch torchaudio
+    "$ENV_DIR/bin/pip" install torch torchaudio
     echo "[OK] PyTorch installed with MPS (Apple Silicon) support"
 else
-    pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+    "$ENV_DIR/bin/pip" install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
     echo "[OK] PyTorch installed (CPU)"
 fi
 
-pip install -r "$INSTALL_DIR/python/requirements.txt"
+"$ENV_DIR/bin/pip" install -r "$INSTALL_DIR/python/requirements.txt"
 
 echo "[6/6] Setting up..."
 mkdir -p "$INSTALL_DIR/weights" "$INSTALL_DIR/models"
@@ -61,8 +67,9 @@ mkdir -p "$INSTALL_DIR/weights" "$INSTALL_DIR/models"
 cat > "$INSTALL_DIR/start_engine.sh" << 'LAUNCHER'
 #!/bin/bash
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-source "$SCRIPT_DIR/miniconda/bin/activate" clonada
-python "$SCRIPT_DIR/python/clonada_server.py" \
+ENV_DIR="$SCRIPT_DIR/miniconda/envs/clonada"
+export PATH="$ENV_DIR/bin:$SCRIPT_DIR/miniconda/bin:$PATH"
+"$ENV_DIR/bin/python" "$SCRIPT_DIR/python/clonada_server.py" \
     --models-dir "$SCRIPT_DIR/models" \
     --weights-dir "$SCRIPT_DIR/weights" "$@"
 LAUNCHER
@@ -72,9 +79,10 @@ chmod +x "$INSTALL_DIR/start_engine.sh"
 cat > "$INSTALL_DIR/activate_license.sh" << 'ACTIVATE'
 #!/bin/bash
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-source "$SCRIPT_DIR/miniconda/bin/activate" clonada
+ENV_DIR="$SCRIPT_DIR/miniconda/envs/clonada"
+export PATH="$ENV_DIR/bin:$SCRIPT_DIR/miniconda/bin:$PATH"
 read -p "Enter license key: " KEY
-python "$SCRIPT_DIR/python/clonada_server.py" --license-key "$KEY"
+"$ENV_DIR/bin/python" "$SCRIPT_DIR/python/clonada_server.py" --license-key "$KEY"
 ACTIVATE
 chmod +x "$INSTALL_DIR/activate_license.sh"
 
