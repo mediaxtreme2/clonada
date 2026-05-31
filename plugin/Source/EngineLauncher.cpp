@@ -9,16 +9,15 @@ EngineLauncher::~EngineLauncher() {
 }
 
 juce::File EngineLauncher::findDefaultEnginePath() const {
-    // Look for the Python engine relative to the plugin location
-    // Installation layout: <install_dir>/engine/clonada_engine.py
-    // Or system-wide: ~/Clonada/engine/clonada_engine.py
-
     juce::StringArray searchPaths;
 
 #if JUCE_MAC
+    searchPaths.add(juce::File::getSpecialLocation(juce::File::userHomeDirectory)
+                        .getChildFile("Clonada/python").getFullPathName());
     searchPaths.add("~/Library/Application Support/Clonada/engine");
-    searchPaths.add("/Applications/Clonada/engine");
 #elif JUCE_WINDOWS
+    auto home = juce::File::getSpecialLocation(juce::File::userHomeDirectory);
+    searchPaths.add(home.getChildFile("Clonada/python").getFullPathName());
     auto appData = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory);
     searchPaths.add(appData.getChildFile("Clonada/engine").getFullPathName());
     searchPaths.add("C:/Program Files/Clonada/engine");
@@ -29,8 +28,7 @@ juce::File EngineLauncher::findDefaultEnginePath() const {
 
     for (auto& path : searchPaths) {
         auto dir = juce::File(path);
-        auto script = dir.getChildFile("clonada_engine.py");
-        if (script.existsAsFile())
+        if (dir.getChildFile("clonada_server.py").existsAsFile())
             return dir;
     }
 
@@ -48,25 +46,35 @@ bool EngineLauncher::launch() {
     if (!enginePath_.isDirectory())
         return false;
 
-    auto script = enginePath_.getChildFile("clonada_engine.py");
+    auto script = enginePath_.getChildFile("clonada_server.py");
     if (!script.existsAsFile())
         return false;
 
-    // Look for bundled Python (Miniconda) or system Python
     juce::File pythonExe;
+    auto clonadaHome = enginePath_.getParentDirectory();
 
 #if JUCE_WINDOWS
-    auto bundledPython = enginePath_.getParentDirectory().getChildFile("python/python.exe");
-    if (bundledPython.existsAsFile())
-        pythonExe = bundledPython;
-    else
-        pythonExe = juce::File("python");
+    auto condaPython = clonadaHome.getChildFile("miniconda/envs/clonada/python.exe");
+    if (condaPython.existsAsFile())
+        pythonExe = condaPython;
+    else {
+        auto bundledPython = clonadaHome.getChildFile("python/python.exe");
+        if (bundledPython.existsAsFile())
+            pythonExe = bundledPython;
+        else
+            pythonExe = juce::File("python");
+    }
 #else
-    auto bundledPython = enginePath_.getParentDirectory().getChildFile("python/bin/python3");
-    if (bundledPython.existsAsFile())
-        pythonExe = bundledPython;
-    else
-        pythonExe = juce::File("/usr/bin/python3");
+    auto condaPython = clonadaHome.getChildFile("miniconda/envs/clonada/bin/python3");
+    if (condaPython.existsAsFile())
+        pythonExe = condaPython;
+    else {
+        auto bundledPython = clonadaHome.getChildFile("python/bin/python3");
+        if (bundledPython.existsAsFile())
+            pythonExe = bundledPython;
+        else
+            pythonExe = juce::File("/usr/bin/python3");
+    }
 #endif
 
     process_ = std::make_unique<juce::ChildProcess>();
