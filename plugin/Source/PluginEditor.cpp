@@ -24,7 +24,7 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
     statusLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextGrey));
     addAndMakeVisible(statusLabel_);
 
-    versionLabel_.setText("v1.6.4", juce::dontSendNotification);
+    versionLabel_.setText("v1.6.5", juce::dontSendNotification);
     versionLabel_.setFont(juce::FontOptions(12.0f));
     versionLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextDark));
     versionLabel_.setJustificationType(juce::Justification::centredRight);
@@ -244,7 +244,7 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
     engineInfoLabel_.setFont(juce::FontOptions(13.0f));
     addAndMakeVisible(engineInfoLabel_);
 
-    buildInfoLabel_.setText("Clonada AI Vocal Suite v1.6.4\nmediaXtreme LLC", juce::dontSendNotification);
+    buildInfoLabel_.setText("Clonada AI Vocal Suite v1.6.5\nmediaXtreme LLC", juce::dontSendNotification);
     buildInfoLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextGrey));
     buildInfoLabel_.setFont(juce::FontOptions(14.0f));
     addAndMakeVisible(buildInfoLabel_);
@@ -457,6 +457,26 @@ void ClonadaEditor::paint(juce::Graphics& g) {
     g.setColour(juce::Colour(LnF::kBorder));
     g.drawLine(0, headerH, w, headerH, 0.5f);
 
+    // ── Stylized CLONΛDΛ logo ──
+    {
+        auto logoFont = juce::FontOptions(22.0f, juce::Font::bold);
+        float logoX = 14.0f;
+        float logoY = 14.0f;
+
+        g.setFont(logoFont);
+        g.setColour(juce::Colour(LnF::kTextWhite));
+        g.drawText("CLON", (int)logoX, (int)logoY, 70, 26, juce::Justification::centredLeft, false);
+
+        g.setColour(juce::Colour(LnF::kCyanGlow));
+        g.drawText(juce::CharPointer_UTF8("\xce\x9b" "D" "\xce\x9b"),
+                   (int)(logoX + 68), (int)logoY, 56, 26, juce::Justification::centredLeft, false);
+
+        // Cyan underline accents
+        g.setColour(juce::Colour(LnF::kCyanGlow));
+        g.fillRoundedRectangle(logoX + 76.0f, logoY + 28.0f, 18.0f, 2.5f, 1.0f);
+        g.fillRoundedRectangle(logoX + 106.0f, logoY + 28.0f, 14.0f, 2.5f, 1.0f);
+    }
+
     // Pulsing glow on status dot
     if (processor_.isEngineConnected()) {
         float pulseAlpha = 0.3f + 0.2f * std::sin(statusPulse_);
@@ -545,10 +565,11 @@ void ClonadaEditor::paint(juce::Graphics& g) {
 void ClonadaEditor::resized() {
     auto area = getLocalBounds();
 
-    // Header (0-54)
+    // Header (0-54) — logo drawn in paint(), leave space for it
     auto header = area.removeFromTop(54).reduced(14, 0);
+    header.removeFromLeft(130);
     statusDotLabel_.setBounds(header.removeFromLeft(18).withTrimmedTop(18).withHeight(18));
-    statusLabel_.setBounds(header.removeFromLeft(280).withTrimmedTop(16));
+    statusLabel_.setBounds(header.removeFromLeft(200).withTrimmedTop(16));
     versionLabel_.setBounds(header.withTrimmedTop(18));
 
     // Preset row (48-82)
