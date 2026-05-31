@@ -12,7 +12,11 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
     setResizable(false, false);
 
     // ── Header ──
-    titleLabel_.setVisible(false);
+    titleLabel_.setText("CLONADA", juce::dontSendNotification);
+    titleLabel_.setFont(juce::FontOptions(20.0f, juce::Font::bold));
+    titleLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kCyanGlow));
+    titleLabel_.setJustificationType(juce::Justification::centredLeft);
+    addAndMakeVisible(titleLabel_);
 
     statusDotLabel_.setText(juce::CharPointer_UTF8("\xe2\x97\x8f"), juce::dontSendNotification);
     statusDotLabel_.setFont(juce::FontOptions(13.0f));
@@ -24,9 +28,10 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
     statusLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextGrey));
     addAndMakeVisible(statusLabel_);
 
-    versionLabel_.setText("v1.6.2", juce::dontSendNotification);
+    versionLabel_.setText("v1.6.3", juce::dontSendNotification);
     versionLabel_.setFont(juce::FontOptions(12.0f));
     versionLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextDark));
+    versionLabel_.setJustificationType(juce::Justification::centredRight);
     addAndMakeVisible(versionLabel_);
 
     // ── Preset selector ──
@@ -238,9 +243,9 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
     engineInfoLabel_.setFont(juce::FontOptions(13.0f));
     addAndMakeVisible(engineInfoLabel_);
 
-    buildInfoLabel_.setText("Clonada AI Vocal Suite v1.6.2\nmediaXtreme LLC", juce::dontSendNotification);
-    buildInfoLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextDark));
-    buildInfoLabel_.setFont(juce::FontOptions(12.0f));
+    buildInfoLabel_.setText("Clonada AI Vocal Suite v1.6.3\nmediaXtreme LLC", juce::dontSendNotification);
+    buildInfoLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextGrey));
+    buildInfoLabel_.setFont(juce::FontOptions(14.0f));
     addAndMakeVisible(buildInfoLabel_);
 
     // ── RunPod Cloud GPU ──
@@ -518,31 +523,32 @@ void ClonadaEditor::paint(juce::Graphics& g) {
     g.drawLine(0, h - 34.0f, w, h - 34.0f, 0.5f);
 
     // Footer content
-    g.setColour(juce::Colour(LnF::kTextDark));
-    g.setFont(juce::FontOptions(11.0f));
+    g.setColour(juce::Colour(LnF::kTextGrey));
+    g.setFont(juce::FontOptions(13.0f));
     g.drawText(juce::String(processor_.getLatencySamples()) + " samples",
-               14, (int)h - 28, 100, 20, juce::Justification::centredLeft);
+               14, (int)h - 28, 120, 20, juce::Justification::centredLeft);
 
     auto& lic = processor_.getLicenseClient();
     if (lic.isActivated()) {
         auto tierStr = lic.getTier() == LicenseClient::Tier::Advanced ? "ADVANCED" : "BASIC";
-        g.setColour(juce::Colour(LnF::kCyanGlow).withAlpha(0.7f));
-        g.setFont(juce::FontOptions(9.0f, juce::Font::bold));
-        g.drawText(tierStr, (int)w - 100, (int)h - 28, 80, 20, juce::Justification::centredRight);
+        g.setColour(juce::Colour(LnF::kCyanGlow));
+        g.setFont(juce::FontOptions(13.0f, juce::Font::bold));
+        g.drawText(tierStr, (int)w - 120, (int)h - 28, 100, 20, juce::Justification::centredRight);
     }
 
-    g.setColour(juce::Colour(LnF::kTextDark));
-    g.setFont(juce::FontOptions(9.0f));
-    g.drawText("mediaXtreme LLC", (int)(w / 2 - 60), (int)h - 28, 120, 20, juce::Justification::centred);
+    g.setColour(juce::Colour(LnF::kTextGrey));
+    g.setFont(juce::FontOptions(13.0f));
+    g.drawText("mediaXtreme LLC", (int)(w / 2 - 80), (int)h - 28, 160, 20, juce::Justification::centred);
 }
 
 void ClonadaEditor::resized() {
     auto area = getLocalBounds();
 
-    // Header (0-48)
+    // Header (0-54)
     auto header = area.removeFromTop(54).reduced(14, 0);
+    titleLabel_.setBounds(header.removeFromLeft(140).withTrimmedTop(14).withHeight(26));
     statusDotLabel_.setBounds(header.removeFromLeft(18).withTrimmedTop(18).withHeight(18));
-    statusLabel_.setBounds(header.removeFromLeft(280).withTrimmedTop(16));
+    statusLabel_.setBounds(header.removeFromLeft(220).withTrimmedTop(16));
     versionLabel_.setBounds(header.withTrimmedTop(18));
 
     // Preset row (48-82)
