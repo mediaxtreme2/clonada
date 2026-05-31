@@ -95,6 +95,13 @@ if not exist "%CONDA_DIR%\condabin\conda.bat" (
 )
 
 set "ENV_DIR=%CONDA_DIR%\envs\%ENV_NAME%"
+
+:: Accept conda channel Terms of Service (required by newer Miniconda)
+echo   Accepting conda channel terms...
+call "%CONDA_DIR%\condabin\conda.bat" tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main >nul 2>&1
+call "%CONDA_DIR%\condabin\conda.bat" tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r >nul 2>&1
+call "%CONDA_DIR%\condabin\conda.bat" tos accept --override-channels --channel https://repo.anaconda.com/pkgs/msys2 >nul 2>&1
+
 if exist "%ENV_DIR%\python.exe" (
     echo   [OK] Environment already exists - skipping
 ) else (
@@ -102,8 +109,8 @@ if exist "%ENV_DIR%\python.exe" (
     call "%CONDA_DIR%\condabin\conda.bat" create -p "%ENV_DIR%" python=%PYTHON_VER% -y
     if errorlevel 1 (
         echo.
-        echo   First attempt failed. Retrying with verbose output...
-        call "%CONDA_DIR%\condabin\conda.bat" create -p "%ENV_DIR%" python=%PYTHON_VER% -y -v
+        echo   First attempt failed. Trying with conda-forge channel...
+        call "%CONDA_DIR%\condabin\conda.bat" create -p "%ENV_DIR%" python=%PYTHON_VER% -y --override-channels -c conda-forge
         if errorlevel 1 (
             echo   [ERROR] Failed to create Python environment.
             echo   Try running this installer as Administrator, or check your internet connection.
