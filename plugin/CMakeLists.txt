@@ -73,6 +73,8 @@ juce_add_plugin(Clonada
     PLUGIN_CODE Clon
     FORMATS VST3 AU Standalone
     PRODUCT_NAME "Clonada"
+    ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/../installer/clonada-icon.png"
+    ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/../installer/clonada-icon.png"
     IS_SYNTH FALSE
     NEEDS_MIDI_INPUT FALSE
     NEEDS_MIDI_OUTPUT FALSE
