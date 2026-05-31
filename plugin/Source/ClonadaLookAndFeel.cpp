@@ -20,24 +20,32 @@ void ClonadaLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int w
     auto rw = radius * 2.0f;
     auto angle = startAngle + sliderPos * (endAngle - startAngle);
 
-    // Outer cyan glow halo
+    // Outer cyan glow halo - multi-layered
     auto fillColour = slider.findColour(juce::Slider::rotarySliderFillColourId);
     if (sliderPos > 0.01f) {
         g.setColour(fillColour.withAlpha(0.06f));
-        g.fillEllipse(rx - 4.0f, ry - 4.0f, rw + 8.0f, rw + 8.0f);
+        g.fillEllipse(rx - 12.0f, ry - 12.0f, rw + 24.0f, rw + 24.0f);
+        g.setColour(fillColour.withAlpha(0.12f));
+        g.fillEllipse(rx - 5.0f, ry - 5.0f, rw + 10.0f, rw + 10.0f);
     }
 
     // Outer shadow
-    g.setColour(juce::Colours::black.withAlpha(0.5f));
-    g.fillEllipse(rx + 1.5f, ry + 1.5f, rw, rw);
+    g.setColour(juce::Colours::black.withAlpha(0.6f));
+    g.fillEllipse(rx + 2.0f, ry + 2.0f, rw, rw);
 
-    // Knob body - obsidian gradient
-    juce::ColourGradient bodyGrad(juce::Colour(0xFF222222), centreX, ry,
-                                   juce::Colour(0xFF0E0E0E), centreX, ry + rw, false);
+    // Knob body - deep obsidian gradient
+    juce::ColourGradient bodyGrad(juce::Colour(0xFF2A2A2A), centreX, ry,
+                                   juce::Colour(0xFF080808), centreX, ry + rw, false);
     g.setGradientFill(bodyGrad);
     g.fillEllipse(rx, ry, rw, rw);
 
-    // Subtle rim
+    // Inner bevel highlight
+    g.setColour(juce::Colour(0xFFFFFFFF).withAlpha(0.04f));
+    g.fillEllipse(rx + 2.0f, ry + 2.0f, rw - 4.0f, rw * 0.5f);
+
+    // Rim with cyan edge glow
+    g.setColour(fillColour.withAlpha(0.07f));
+    g.drawEllipse(rx - 1.0f, ry - 1.0f, rw + 2.0f, rw + 2.0f, 2.0f);
     g.setColour(juce::Colour(kBorder));
     g.drawEllipse(rx, ry, rw, rw, 1.0f);
 
@@ -47,10 +55,10 @@ void ClonadaLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int w
     trackArc.addCentredArc(centreX, centreY, trackRadius, trackRadius,
                            0.0f, startAngle, endAngle, true);
     g.setColour(juce::Colour(kKnobTrack));
-    g.strokePath(trackArc, juce::PathStrokeType(3.0f, juce::PathStrokeType::curved,
+    g.strokePath(trackArc, juce::PathStrokeType(4.0f, juce::PathStrokeType::curved,
                                                   juce::PathStrokeType::rounded));
 
-    // Value arc
+    // Value arc with triple-layer glow
     if (sliderPos > 0.0f) {
         juce::Path valueArc;
 
@@ -62,19 +70,21 @@ void ClonadaLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int w
         valueArc.addCentredArc(centreX, centreY, trackRadius, trackRadius,
                                0.0f, arcStart, arcEnd, true);
 
-        // Glow layer
-        g.setColour(fillColour.withAlpha(0.2f));
+        g.setColour(fillColour.withAlpha(0.12f));
+        g.strokePath(valueArc, juce::PathStrokeType(14.0f, juce::PathStrokeType::curved,
+                                                      juce::PathStrokeType::rounded));
+        g.setColour(fillColour.withAlpha(0.3f));
         g.strokePath(valueArc, juce::PathStrokeType(7.0f, juce::PathStrokeType::curved,
                                                       juce::PathStrokeType::rounded));
         g.setColour(fillColour);
-        g.strokePath(valueArc, juce::PathStrokeType(3.0f, juce::PathStrokeType::curved,
+        g.strokePath(valueArc, juce::PathStrokeType(4.0f, juce::PathStrokeType::curved,
                                                       juce::PathStrokeType::rounded));
     }
 
     // Pointer line
     juce::Path pointer;
     auto pointerLength = radius * 0.55f;
-    auto pointerThickness = 2.5f;
+    auto pointerThickness = 3.0f;
     pointer.addRoundedRectangle(-pointerThickness * 0.5f, -radius + 6.0f,
                                  pointerThickness, pointerLength, 1.0f);
     pointer.applyTransform(juce::AffineTransform::rotation(angle).translated(centreX, centreY));
@@ -83,7 +93,9 @@ void ClonadaLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int w
     g.setColour(thumbCol);
     g.fillPath(pointer);
 
-    // Center dot
+    // Center dot with subtle glow
+    g.setColour(fillColour.withAlpha(0.15f));
+    g.fillEllipse(centreX - 5.0f, centreY - 5.0f, 10.0f, 10.0f);
     g.setColour(juce::Colour(kBorder));
     g.fillEllipse(centreX - 3.0f, centreY - 3.0f, 6.0f, 6.0f);
 }
@@ -187,14 +199,14 @@ void ClonadaLookAndFeel::drawToggleButton(juce::Graphics& g, juce::ToggleButton&
     g.fillEllipse(thumbX, trackBounds.getCentreY() - thumbSize * 0.5f, thumbSize, thumbSize);
 
     g.setColour(button.findColour(juce::ToggleButton::textColourId));
-    g.setFont(juce::FontOptions(12.0f));
+    g.setFont(juce::FontOptions(13.0f));
     g.drawText(button.getButtonText(), bounds.reduced(4.0f, 0.0f), juce::Justification::centredLeft);
 }
 
 juce::Font ClonadaLookAndFeel::getComboBoxFont(juce::ComboBox&) {
-    return juce::Font(juce::FontOptions(13.0f));
+    return juce::Font(juce::FontOptions(14.0f));
 }
 
 juce::Font ClonadaLookAndFeel::getTextButtonFont(juce::TextButton&, int) {
-    return juce::Font(juce::FontOptions(12.0f));
+    return juce::Font(juce::FontOptions(13.0f));
 }

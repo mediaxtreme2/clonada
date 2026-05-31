@@ -8,27 +8,24 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
       waveformDisplay_(p.getWaveformDisplay()) {
 
     setLookAndFeel(&lnf_);
-    setSize(760, 620);
+    setSize(820, 680);
     setResizable(false, false);
 
     // ── Header ──
-    titleLabel_.setText(juce::String::fromUTF8("CLON\xce\x9b" "D" "\xce\x9b"), juce::dontSendNotification);
-    titleLabel_.setFont(juce::FontOptions(22.0f, juce::Font::bold));
-    titleLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kCyanGlow));
-    addAndMakeVisible(titleLabel_);
+    titleLabel_.setVisible(false);
 
     statusDotLabel_.setText(juce::CharPointer_UTF8("\xe2\x97\x8f"), juce::dontSendNotification);
-    statusDotLabel_.setFont(juce::FontOptions(10.0f));
+    statusDotLabel_.setFont(juce::FontOptions(13.0f));
     statusDotLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kRed));
     addAndMakeVisible(statusDotLabel_);
 
     statusLabel_.setText("Engine Offline", juce::dontSendNotification);
-    statusLabel_.setFont(juce::FontOptions(11.0f));
+    statusLabel_.setFont(juce::FontOptions(13.0f));
     statusLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextGrey));
     addAndMakeVisible(statusLabel_);
 
-    versionLabel_.setText("v1.4.0", juce::dontSendNotification);
-    versionLabel_.setFont(juce::FontOptions(10.0f));
+    versionLabel_.setText("v1.5.0", juce::dontSendNotification);
+    versionLabel_.setFont(juce::FontOptions(12.0f));
     versionLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextDark));
     addAndMakeVisible(versionLabel_);
 
@@ -67,7 +64,7 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
     // ── Knob setup ──
     auto setupKnob = [this](juce::Slider& s) {
         s.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-        s.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 16);
+        s.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 70, 18);
         s.setColour(juce::Slider::rotarySliderFillColourId, juce::Colour(LnF::kCyanGlow));
         s.setColour(juce::Slider::thumbColourId, juce::Colour(LnF::kCyanGlow));
         s.setColour(juce::Slider::textBoxTextColourId, juce::Colour(LnF::kTextWhite));
@@ -78,7 +75,7 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
     auto setupKnobLabel = [this](juce::Label& l) {
         l.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextGrey));
         l.setJustificationType(juce::Justification::centred);
-        l.setFont(juce::FontOptions(9.0f, juce::Font::bold));
+        l.setFont(juce::FontOptions(14.0f, juce::Font::bold));
         addAndMakeVisible(l);
     };
 
@@ -93,7 +90,7 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
 
     // ── Identity Bank (model selector) ──
     identityBankLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextGrey));
-    identityBankLabel_.setFont(juce::FontOptions(10.0f, juce::Font::bold));
+    identityBankLabel_.setFont(juce::FontOptions(14.0f, juce::Font::bold));
     addAndMakeVisible(identityBankLabel_);
 
     modelSelector_.setColour(juce::ComboBox::backgroundColourId, juce::Colour(LnF::kSlatePanel));
@@ -136,7 +133,7 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
 
     // ── Pitch Tracker radio buttons ──
     pitchTrackerLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextGrey));
-    pitchTrackerLabel_.setFont(juce::FontOptions(9.0f, juce::Font::bold));
+    pitchTrackerLabel_.setFont(juce::FontOptions(13.0f, juce::Font::bold));
     addAndMakeVisible(pitchTrackerLabel_);
 
     auto setupRadio = [this](juce::ToggleButton& btn, int /*groupId*/) {
@@ -207,7 +204,7 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
     auto setupFaderLabel = [this](juce::Label& l) {
         l.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextGrey));
         l.setJustificationType(juce::Justification::centred);
-        l.setFont(juce::FontOptions(10.0f, juce::Font::bold));
+        l.setFont(juce::FontOptions(13.0f, juce::Font::bold));
         addAndMakeVisible(l);
     };
     setupFader(inputGainSlider_);
@@ -238,24 +235,24 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
     addAndMakeVisible(licenseButton_);
 
     engineInfoLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextGrey));
-    engineInfoLabel_.setFont(juce::FontOptions(11.0f));
+    engineInfoLabel_.setFont(juce::FontOptions(13.0f));
     addAndMakeVisible(engineInfoLabel_);
 
-    buildInfoLabel_.setText("Clonada AI Vocal Suite v1.4.0\nmediaXtreme LLC", juce::dontSendNotification);
+    buildInfoLabel_.setText("Clonada AI Vocal Suite v1.5.0\nmediaXtreme LLC", juce::dontSendNotification);
     buildInfoLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextDark));
-    buildInfoLabel_.setFont(juce::FontOptions(10.0f));
+    buildInfoLabel_.setFont(juce::FontOptions(12.0f));
     addAndMakeVisible(buildInfoLabel_);
 
     // ── RunPod Cloud GPU ──
     runpodSectionLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kCyanGlow));
-    runpodSectionLabel_.setFont(juce::FontOptions(12.0f, juce::Font::bold));
+    runpodSectionLabel_.setFont(juce::FontOptions(16.0f, juce::Font::bold));
     addAndMakeVisible(runpodSectionLabel_);
 
     runpodKeyLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextGrey));
-    runpodKeyLabel_.setFont(juce::FontOptions(10.0f));
+    runpodKeyLabel_.setFont(juce::FontOptions(12.0f));
     addAndMakeVisible(runpodKeyLabel_);
 
-    runpodKeyInput_.setFont(juce::FontOptions(12.0f));
+    runpodKeyInput_.setFont(juce::FontOptions(13.0f));
     runpodKeyInput_.setTextToShowWhenEmpty("rpa_XXXXXXXXXXXXXXXXXXXXXXXX", juce::Colour(LnF::kTextDark));
     runpodKeyInput_.setColour(juce::TextEditor::backgroundColourId, juce::Colour(LnF::kSlatePanel));
     runpodKeyInput_.setColour(juce::TextEditor::textColourId, juce::Colour(LnF::kTextWhite));
@@ -282,7 +279,7 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
     };
     addAndMakeVisible(runpodSaveButton_);
 
-    runpodStatusLabel_.setFont(juce::FontOptions(10.0f));
+    runpodStatusLabel_.setFont(juce::FontOptions(12.0f));
     runpodStatusLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextDim));
     if (savedKey.isNotEmpty()) {
         runpodStatusLabel_.setText("Key configured", juce::dontSendNotification);
@@ -436,16 +433,21 @@ void ClonadaEditor::paint(juce::Graphics& g) {
     // Background
     g.fillAll(juce::Colour(LnF::kObsidian));
 
-    // Subtle gradient overlay
-    juce::ColourGradient bgGrad(juce::Colour(LnF::kObsidian), 0, 0,
-                                 juce::Colour(0xFF111111), w * 0.5f, h, true);
+    // Rich gradient overlay
+    juce::ColourGradient bgGrad(juce::Colour(0xFF0F0F12), 0, 0,
+                                 juce::Colour(0xFF080810), w, h, false);
+    bgGrad.addColour(0.5, juce::Colour(0xFF0A0A0F));
     g.setGradientFill(bgGrad);
     g.fillAll();
 
     // ── Header bar ──
-    auto headerH = 48.0f;
-    g.setColour(juce::Colour(LnF::kSlatePanel).withAlpha(0.9f));
+    auto headerH = 54.0f;
+    juce::ColourGradient headerGrad(juce::Colour(0xFF141418), 0, 0,
+                                     juce::Colour(0xFF0C0C10), 0, headerH, false);
+    g.setGradientFill(headerGrad);
     g.fillRect(0.0f, 0.0f, w, headerH);
+    g.setColour(juce::Colour(LnF::kCyanGlow).withAlpha(0.2f));
+    g.drawLine(0, headerH - 0.5f, w, headerH - 0.5f, 1.0f);
     g.setColour(juce::Colour(LnF::kBorder));
     g.drawLine(0, headerH, w, headerH, 0.5f);
 
@@ -475,17 +477,20 @@ void ClonadaEditor::paint(juce::Graphics& g) {
     juce::TextButton* tabs[] = { &tabModeling_, &tabPerformance_, &tabSettings_ };
     auto& activeTabBtn = *tabs[activeTab_];
     auto tabBounds = activeTabBtn.getBounds().toFloat();
+    g.setColour(juce::Colour(LnF::kCyanGlow).withAlpha(0.25f));
+    g.fillRoundedRectangle(tabBounds.getX() + 4, tabBounds.getBottom() - 4.0f,
+                            tabBounds.getWidth() - 8, 4.0f, 2.0f);
     g.setColour(juce::Colour(LnF::kCyanGlow));
-    g.fillRoundedRectangle(tabBounds.getX() + 8, tabBounds.getBottom() - 2.5f,
-                            tabBounds.getWidth() - 16, 2.5f, 1.0f);
+    g.fillRoundedRectangle(tabBounds.getX() + 8, tabBounds.getBottom() - 3.0f,
+                            tabBounds.getWidth() - 16, 3.0f, 1.5f);
 
     // ── Content panel ──
     auto contentY = tabY + 36.0f;
     auto contentH = h - contentY - 34.0f;
     g.setColour(juce::Colour(LnF::kSlatePanel).withAlpha(0.15f));
     g.fillRoundedRectangle(12.0f, contentY + 8.0f, w - 24.0f, contentH - 8.0f, 10.0f);
-    g.setColour(juce::Colour(LnF::kBorder).withAlpha(0.2f));
-    g.drawRoundedRectangle(12.0f, contentY + 8.0f, w - 24.0f, contentH - 8.0f, 10.0f, 0.5f);
+    g.setColour(juce::Colour(LnF::kCyanGlow).withAlpha(0.05f));
+    g.drawRoundedRectangle(12.0f, contentY + 8.0f, w - 24.0f, contentH - 8.0f, 10.0f, 1.5f);
 
     // ── Performance Bridge: draw meters ──
     if (activeTab_ == 1) {
@@ -498,20 +503,23 @@ void ClonadaEditor::paint(juce::Graphics& g) {
     // ── Modeling Studio: Apply button glow ──
     if (activeTab_ == 0 && applyButton_.isVisible()) {
         auto btnBounds = applyButton_.getBounds().toFloat();
-        float glowAlpha = 0.08f + 0.04f * std::sin(statusPulse_ * 1.5f);
+        float glowAlpha = 0.05f + 0.03f * std::sin(statusPulse_ * 1.5f);
         g.setColour(juce::Colour(LnF::kCyanGlow).withAlpha(glowAlpha));
-        g.fillRoundedRectangle(btnBounds.expanded(6.0f), 10.0f);
+        g.fillRoundedRectangle(btnBounds.expanded(14.0f), 14.0f);
+        float innerGlow = 0.1f + 0.05f * std::sin(statusPulse_ * 1.5f);
+        g.setColour(juce::Colour(LnF::kCyanGlow).withAlpha(innerGlow));
+        g.fillRoundedRectangle(btnBounds.expanded(4.0f), 8.0f);
     }
 
     // ── Footer bar ──
-    g.setColour(juce::Colour(LnF::kSlatePanel).withAlpha(0.6f));
+    g.setColour(juce::Colour(0xFF101014).withAlpha(0.8f));
     g.fillRect(0.0f, h - 34.0f, w, 34.0f);
-    g.setColour(juce::Colour(LnF::kBorder).withAlpha(0.3f));
+    g.setColour(juce::Colour(LnF::kCyanGlow).withAlpha(0.1f));
     g.drawLine(0, h - 34.0f, w, h - 34.0f, 0.5f);
 
     // Footer content
     g.setColour(juce::Colour(LnF::kTextDark));
-    g.setFont(juce::FontOptions(10.0f));
+    g.setFont(juce::FontOptions(11.0f));
     g.drawText(juce::String(processor_.getLatencySamples()) + " samples",
                14, (int)h - 28, 100, 20, juce::Justification::centredLeft);
 
@@ -532,10 +540,9 @@ void ClonadaEditor::resized() {
     auto area = getLocalBounds();
 
     // Header (0-48)
-    auto header = area.removeFromTop(48).reduced(14, 0);
-    titleLabel_.setBounds(header.removeFromLeft(120).withTrimmedTop(12));
-    statusDotLabel_.setBounds(header.removeFromLeft(14).withTrimmedTop(18).withHeight(14));
-    statusLabel_.setBounds(header.removeFromLeft(200).withTrimmedTop(16));
+    auto header = area.removeFromTop(54).reduced(14, 0);
+    statusDotLabel_.setBounds(header.removeFromLeft(18).withTrimmedTop(18).withHeight(18));
+    statusLabel_.setBounds(header.removeFromLeft(280).withTrimmedTop(16));
     versionLabel_.setBounds(header.withTrimmedTop(18));
 
     // Preset row (48-82)
@@ -559,46 +566,46 @@ void ClonadaEditor::resized() {
 
     if (activeTab_ == 0) {
         // ── Modeling Studio ──
-        auto modelRow = content.removeFromTop(32);
-        identityBankLabel_.setBounds(modelRow.removeFromLeft(100).withTrimmedTop(6));
-        browseButton_.setBounds(modelRow.removeFromRight(32).withHeight(26).withTrimmedTop(3));
+        auto modelRow = content.removeFromTop(38);
+        identityBankLabel_.setBounds(modelRow.removeFromLeft(130).withTrimmedTop(6));
+        browseButton_.setBounds(modelRow.removeFromRight(32).withHeight(28).withTrimmedTop(3));
         modelRow.removeFromRight(6);
-        modelSelector_.setBounds(modelRow.withHeight(26).withTrimmedTop(3));
+        modelSelector_.setBounds(modelRow.withHeight(28).withTrimmedTop(3));
 
         content.removeFromTop(12);
 
         // 4 knobs in a row
-        auto knobRow = content.removeFromTop(130);
+        auto knobRow = content.removeFromTop(160);
         int knobW = knobRow.getWidth() / 4;
 
         auto pk = knobRow.removeFromLeft(knobW);
-        pitchLabel_.setBounds(pk.removeFromTop(14));
-        pitchSlider_.setBounds(pk.reduced(6, 0));
+        pitchLabel_.setBounds(pk.removeFromTop(20));
+        pitchSlider_.setBounds(pk.reduced(2, 0));
 
         auto mk = knobRow.removeFromLeft(knobW);
-        mixLabel_.setBounds(mk.removeFromTop(14));
-        mixSlider_.setBounds(mk.reduced(6, 0));
+        mixLabel_.setBounds(mk.removeFromTop(20));
+        mixSlider_.setBounds(mk.reduced(2, 0));
 
         auto fk = knobRow.removeFromLeft(knobW);
-        formantLabel_.setBounds(fk.removeFromTop(14));
-        formantSlider_.setBounds(fk.reduced(6, 0));
+        formantLabel_.setBounds(fk.removeFromTop(20));
+        formantSlider_.setBounds(fk.reduced(2, 0));
 
         auto gk = knobRow;
-        gritLabel_.setBounds(gk.removeFromTop(14));
-        gritSlider_.setBounds(gk.reduced(6, 0));
+        gritLabel_.setBounds(gk.removeFromTop(20));
+        gritSlider_.setBounds(gk.reduced(2, 0));
 
         content.removeFromTop(8);
 
         // Pitch tracker row
-        auto trackerRow = content.removeFromTop(28);
-        pitchTrackerLabel_.setBounds(trackerRow.removeFromLeft(100).withTrimmedTop(4));
+        auto trackerRow = content.removeFromTop(32);
+        pitchTrackerLabel_.setBounds(trackerRow.removeFromLeft(120).withTrimmedTop(4));
         rmvpeButton_.setBounds(trackerRow.removeFromLeft(100).withTrimmedTop(2));
         crepeButton_.setBounds(trackerRow.removeFromLeft(100).withTrimmedTop(2));
 
         content.removeFromTop(10);
 
         // Mode cards
-        auto modeRow = content.removeFromTop(44);
+        auto modeRow = content.removeFromTop(48);
         int cardW = (modeRow.getWidth() - 12) / 2;
         lowLatencyCard_.setBounds(modeRow.removeFromLeft(cardW));
         modeRow.removeFromLeft(12);
@@ -607,7 +614,7 @@ void ClonadaEditor::resized() {
         content.removeFromTop(14);
 
         // Apply button
-        auto applyRow = content.removeFromTop(42);
+        auto applyRow = content.removeFromTop(46);
         applyButton_.setBounds(applyRow.reduced(content.getWidth() / 6, 0));
 
     } else if (activeTab_ == 1) {
@@ -630,25 +637,25 @@ void ClonadaEditor::resized() {
 
     } else if (activeTab_ == 2) {
         // ── Settings ──
-        content.removeFromTop(12);
-        licenseButton_.setBounds(content.removeFromTop(32).reduced(content.getWidth() / 4, 0));
         content.removeFromTop(14);
+        licenseButton_.setBounds(content.removeFromTop(36).reduced(content.getWidth() / 4, 0));
+        content.removeFromTop(16);
 
         // RunPod Cloud GPU section
-        runpodSectionLabel_.setBounds(content.removeFromTop(20).reduced(20, 0));
-        content.removeFromTop(6);
-        auto rpRow = content.removeFromTop(28).reduced(20, 0);
-        runpodKeyLabel_.setBounds(rpRow.removeFromLeft(54).withTrimmedTop(4));
-        runpodSaveButton_.setBounds(rpRow.removeFromRight(72).withHeight(26).withTrimmedTop(1));
+        runpodSectionLabel_.setBounds(content.removeFromTop(24).reduced(20, 0));
+        content.removeFromTop(8);
+        auto rpRow = content.removeFromTop(32).reduced(20, 0);
+        runpodKeyLabel_.setBounds(rpRow.removeFromLeft(70).withTrimmedTop(4));
+        runpodSaveButton_.setBounds(rpRow.removeFromRight(80).withHeight(28).withTrimmedTop(1));
         rpRow.removeFromRight(6);
-        runpodKeyInput_.setBounds(rpRow.withHeight(26).withTrimmedTop(1));
-        content.removeFromTop(4);
-        runpodStatusLabel_.setBounds(content.removeFromTop(16).reduced(74, 0));
+        runpodKeyInput_.setBounds(rpRow.withHeight(28).withTrimmedTop(1));
+        content.removeFromTop(6);
+        runpodStatusLabel_.setBounds(content.removeFromTop(18).reduced(74, 0));
 
-        content.removeFromTop(14);
-        engineInfoLabel_.setBounds(content.removeFromTop(52).reduced(20, 0));
-        content.removeFromTop(10);
-        buildInfoLabel_.setBounds(content.removeFromTop(36).reduced(20, 0));
+        content.removeFromTop(16);
+        engineInfoLabel_.setBounds(content.removeFromTop(56).reduced(20, 0));
+        content.removeFromTop(12);
+        buildInfoLabel_.setBounds(content.removeFromTop(40).reduced(20, 0));
     }
 
     // Overlays
