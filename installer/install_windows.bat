@@ -66,7 +66,8 @@ if errorlevel 1 (
 
 echo.
 echo [3/7] Installing Miniconda (silent, please wait)...
-start /wait "%CLONADA_HOME%\miniconda_installer.exe" /S /D=%CONDA_DIR%
+start /wait "" "%CLONADA_HOME%\miniconda_installer.exe" /S /D=%CONDA_DIR%
+timeout /t 5 /nobreak >nul
 del "%CLONADA_HOME%\miniconda_installer.exe" >nul 2>&1
 echo   [OK] Miniconda installed
 
@@ -77,15 +78,38 @@ echo   [OK] Miniconda installed
 echo.
 echo [4/7] Creating Python %PYTHON_VER% environment...
 
+:: Verify conda is actually available
+if not exist "%CONDA_DIR%\condabin\conda.bat" (
+    echo   [ERROR] Miniconda not found at %CONDA_DIR%
+    echo   Retrying Miniconda install...
+    if exist "%CONDA_DIR%" rd /s /q "%CONDA_DIR%" >nul 2>&1
+    curl -L -o "%CLONADA_HOME%\miniconda_installer.exe" https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe
+    start /wait "" "%CLONADA_HOME%\miniconda_installer.exe" /S /D=%CONDA_DIR%
+    del "%CLONADA_HOME%\miniconda_installer.exe" >nul 2>&1
+    timeout /t 5 /nobreak >nul
+    if not exist "%CONDA_DIR%\condabin\conda.bat" (
+        echo   [ERROR] Miniconda installation failed. Please run this installer again as Administrator.
+        pause
+        exit /b 1
+    )
+)
+
 set "ENV_DIR=%CONDA_DIR%\envs\%ENV_NAME%"
 if exist "%ENV_DIR%\python.exe" (
     echo   [OK] Environment already exists - skipping
 ) else (
-    call "%CONDA_DIR%\condabin\conda.bat" create -p "%ENV_DIR%" python=%PYTHON_VER% -y -q >nul 2>&1
+    echo   Running: conda create python=%PYTHON_VER% ...
+    call "%CONDA_DIR%\condabin\conda.bat" create -p "%ENV_DIR%" python=%PYTHON_VER% -y
     if errorlevel 1 (
-        echo   [ERROR] Failed to create Python environment
-        pause
-        exit /b 1
+        echo.
+        echo   First attempt failed. Retrying with verbose output...
+        call "%CONDA_DIR%\condabin\conda.bat" create -p "%ENV_DIR%" python=%PYTHON_VER% -y -v
+        if errorlevel 1 (
+            echo   [ERROR] Failed to create Python environment.
+            echo   Try running this installer as Administrator, or check your internet connection.
+            pause
+            exit /b 1
+        )
     )
     echo   [OK] Python %PYTHON_VER% environment created
 )
