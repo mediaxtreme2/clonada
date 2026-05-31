@@ -6,7 +6,7 @@
   #define AppVersion "1.2.0"
 #endif
 #define AppPublisher "mediaXtreme LLC"
-#define AppURL "https://github.com/anirudhatalmale6-alt/clonada"
+#define AppURL "https://mediaxtreme.com"
 
 [Setup]
 AppId={{A3F2C7E1-8B4D-4E9A-B5C6-1D2E3F4A5B6C}
