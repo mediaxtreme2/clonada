@@ -7,7 +7,7 @@ set -e
 # ════════════════════════════════════════════════════════════════
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-VERSION="1.2.0"
+VERSION="1.6.6"
 INSTALL_DIR="$HOME/Clonada"
 CONDA_DIR="$INSTALL_DIR/miniconda"
 ENV_NAME="clonada"
@@ -176,7 +176,11 @@ ENV_DIR="$CONDA_DIR/envs/$ENV_NAME"
 if [ -d "$ENV_DIR" ] && [ -f "$ENV_DIR/bin/python" ]; then
     ok "Environment 'clonada' already exists — skipping"
 else
-    "$CONDA_DIR/bin/conda" create -p "$ENV_DIR" python="$PYTHON_VER" -y -q || \
+    # Use conda-forge to avoid Anaconda ToS channel issues
+    "$CONDA_DIR/bin/conda" config --add channels conda-forge 2>/dev/null || true
+    "$CONDA_DIR/bin/conda" config --remove channels defaults 2>/dev/null || true
+    "$CONDA_DIR/bin/conda" config --set channel_priority strict 2>/dev/null || true
+    "$CONDA_DIR/bin/conda" create -p "$ENV_DIR" python="$PYTHON_VER" -c conda-forge --override-channels -y -q || \
         fail "Failed to create Python environment"
     ok "Python ${PYTHON_VER} environment created"
 fi
