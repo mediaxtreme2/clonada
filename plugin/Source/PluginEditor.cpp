@@ -24,7 +24,7 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
     statusLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextGrey));
     addAndMakeVisible(statusLabel_);
 
-    versionLabel_.setText("v1.5.0", juce::dontSendNotification);
+    versionLabel_.setText("v1.6.0", juce::dontSendNotification);
     versionLabel_.setFont(juce::FontOptions(12.0f));
     versionLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextDark));
     addAndMakeVisible(versionLabel_);
@@ -238,7 +238,7 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
     engineInfoLabel_.setFont(juce::FontOptions(13.0f));
     addAndMakeVisible(engineInfoLabel_);
 
-    buildInfoLabel_.setText("Clonada AI Vocal Suite v1.5.0\nmediaXtreme LLC", juce::dontSendNotification);
+    buildInfoLabel_.setText("Clonada AI Vocal Suite v1.6.0\nmediaXtreme LLC", juce::dontSendNotification);
     buildInfoLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextDark));
     buildInfoLabel_.setFont(juce::FontOptions(12.0f));
     addAndMakeVisible(buildInfoLabel_);
