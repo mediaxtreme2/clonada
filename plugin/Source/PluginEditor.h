@@ -14,6 +14,7 @@ public:
 
     void paint(juce::Graphics&) override;
     void resized() override;
+    void parentHierarchyChanged() override;
 
 private:
     void timerCallback() override;

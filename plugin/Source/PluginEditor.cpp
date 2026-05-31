@@ -24,7 +24,7 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
     statusLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextGrey));
     addAndMakeVisible(statusLabel_);
 
-    versionLabel_.setText("v1.6.5", juce::dontSendNotification);
+    versionLabel_.setText("v1.6.6", juce::dontSendNotification);
     versionLabel_.setFont(juce::FontOptions(12.0f));
     versionLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextDark));
     versionLabel_.setJustificationType(juce::Justification::centredRight);
@@ -244,7 +244,7 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
     engineInfoLabel_.setFont(juce::FontOptions(13.0f));
     addAndMakeVisible(engineInfoLabel_);
 
-    buildInfoLabel_.setText("Clonada AI Vocal Suite v1.6.5\nmediaXtreme LLC", juce::dontSendNotification);
+    buildInfoLabel_.setText("Clonada AI Vocal Suite v1.6.6\nmediaXtreme LLC", juce::dontSendNotification);
     buildInfoLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextGrey));
     buildInfoLabel_.setFont(juce::FontOptions(14.0f));
     addAndMakeVisible(buildInfoLabel_);
@@ -341,6 +341,16 @@ ClonadaEditor::~ClonadaEditor() {
     stopTimer();
     setLookAndFeel(nullptr);
 }
+
+void ClonadaEditor::parentHierarchyChanged() {
+    if (auto* top = getTopLevelComponent()) {
+        if (auto* window = dynamic_cast<juce::DocumentWindow*>(top))
+            window->setName("");
+        else
+            top->setName("");
+    }
+}
+
 
 void ClonadaEditor::switchTab(int tabIndex) {
     activeTab_ = tabIndex;
@@ -457,24 +467,34 @@ void ClonadaEditor::paint(juce::Graphics& g) {
     g.setColour(juce::Colour(LnF::kBorder));
     g.drawLine(0, headerH, w, headerH, 0.5f);
 
-    // ── Stylized CLONΛDΛ logo ──
+    // ── Stylized CLONΛDΛ logo with wide letter-spacing ──
     {
-        auto logoFont = juce::FontOptions(22.0f, juce::Font::bold);
-        float logoX = 14.0f;
+        auto logoFont = juce::Font(juce::FontOptions(20.0f, juce::Font::bold));
+        float logoX = 18.0f;
         float logoY = 14.0f;
+        float spacing = 5.0f;
 
         g.setFont(logoFont);
+
+        const char* whiteChars[] = { "C", "L", "O", "N" };
+        float cx = logoX;
         g.setColour(juce::Colour(LnF::kTextWhite));
-        g.drawText("CLON", (int)logoX, (int)logoY, 70, 26, juce::Justification::centredLeft, false);
+        for (auto* ch : whiteChars) {
+            g.drawText(ch, (int)cx, (int)logoY, 16, 26, juce::Justification::centredLeft, false);
+            cx += logoFont.getStringWidthFloat(ch) + spacing;
+        }
 
+        const char* cyanChars[] = { "\xce\x9b", "D", "\xce\x9b" };
         g.setColour(juce::Colour(LnF::kCyanGlow));
-        g.drawText(juce::CharPointer_UTF8("\xce\x9b" "D" "\xce\x9b"),
-                   (int)(logoX + 68), (int)logoY, 56, 26, juce::Justification::centredLeft, false);
+        for (auto* ch : cyanChars) {
+            g.drawText(juce::CharPointer_UTF8(ch), (int)cx, (int)logoY, 16, 26, juce::Justification::centredLeft, false);
+            cx += logoFont.getStringWidthFloat(juce::CharPointer_UTF8(ch)) + spacing;
+        }
 
-        // Cyan underline accents
-        g.setColour(juce::Colour(LnF::kCyanGlow));
-        g.fillRoundedRectangle(logoX + 76.0f, logoY + 28.0f, 18.0f, 2.5f, 1.0f);
-        g.fillRoundedRectangle(logoX + 106.0f, logoY + 28.0f, 14.0f, 2.5f, 1.0f);
+        // Cyan underline accent bar
+        float barStart = logoX + (logoFont.getStringWidthFloat("C") + spacing) * 4;
+        g.setColour(juce::Colour(LnF::kCyanGlow).withAlpha(0.7f));
+        g.fillRect(barStart, logoY + 27.0f, cx - barStart - spacing, 2.0f);
     }
 
     // Pulsing glow on status dot
@@ -510,13 +530,13 @@ void ClonadaEditor::paint(juce::Graphics& g) {
     g.fillRoundedRectangle(tabBounds.getX() + 8, tabBounds.getBottom() - 3.0f,
                             tabBounds.getWidth() - 16, 3.0f, 1.5f);
 
-    // ── Content panel ──
+    // ── Content panel (sharp industrial edges) ──
     auto contentY = tabY + 36.0f;
     auto contentH = h - contentY - 34.0f;
     g.setColour(juce::Colour(LnF::kSlatePanel).withAlpha(0.15f));
-    g.fillRoundedRectangle(12.0f, contentY + 8.0f, w - 24.0f, contentH - 8.0f, 10.0f);
+    g.fillRect(12.0f, contentY + 8.0f, w - 24.0f, contentH - 8.0f);
     g.setColour(juce::Colour(LnF::kCyanGlow).withAlpha(0.05f));
-    g.drawRoundedRectangle(12.0f, contentY + 8.0f, w - 24.0f, contentH - 8.0f, 10.0f, 1.5f);
+    g.drawRect(juce::Rectangle<float>(12.0f, contentY + 8.0f, w - 24.0f, contentH - 8.0f), 1.0f);
 
     // ── Performance Bridge: draw meters ──
     if (activeTab_ == 1) {

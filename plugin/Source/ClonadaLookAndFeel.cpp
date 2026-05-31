@@ -144,7 +144,6 @@ void ClonadaLookAndFeel::drawLinearSlider(juce::Graphics& g, int x, int y, int w
 void ClonadaLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& button,
                                                 const juce::Colour& bg, bool highlighted, bool down) {
     auto bounds = button.getLocalBounds().toFloat().reduced(0.5f);
-    auto cornerSize = 6.0f;
 
     auto baseColour = bg;
     if (down)
@@ -153,26 +152,23 @@ void ClonadaLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& b
         baseColour = baseColour.brighter(0.07f);
 
     g.setColour(baseColour);
-    g.fillRoundedRectangle(bounds, cornerSize);
+    g.fillRect(bounds);
 
-    // Subtle border
     g.setColour(juce::Colour(kBorder));
-    g.drawRoundedRectangle(bounds, cornerSize, 0.5f);
+    g.drawRect(bounds, 0.5f);
 }
 
 void ClonadaLookAndFeel::drawComboBox(juce::Graphics& g, int w, int h, bool down,
                                        int, int, int, int, juce::ComboBox& box) {
     auto bounds = juce::Rectangle<float>(0, 0, (float)w, (float)h);
-    auto cornerSize = 6.0f;
 
     g.setColour(box.findColour(juce::ComboBox::backgroundColourId));
-    g.fillRoundedRectangle(bounds, cornerSize);
+    g.fillRect(bounds);
 
     auto outlineColour = box.findColour(juce::ComboBox::outlineColourId);
     g.setColour(down ? outlineColour.brighter(0.2f) : outlineColour);
-    g.drawRoundedRectangle(bounds.reduced(0.5f), cornerSize, 1.0f);
+    g.drawRect(bounds.reduced(0.5f), 1.0f);
 
-    // Arrow
     auto arrowZone = bounds.removeFromRight(24.0f).reduced(7.0f, 9.0f);
     juce::Path arrow;
     arrow.addTriangle(arrowZone.getX(), arrowZone.getY(),
