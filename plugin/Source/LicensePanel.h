@@ -11,6 +11,7 @@ public:
     void resized() override;
 
     std::function<void()> onLicenseActivated;
+    std::function<void()> onClose;
 
 private:
     void updateUI();
@@ -26,6 +27,7 @@ private:
     juce::TextEditor keyInput_;
     juce::TextButton activateButton_{"Activate"};
     juce::TextButton deactivateButton_{"Deactivate"};
+    juce::TextButton closeButton_{juce::CharPointer_UTF8("\xe2\x9c\x95")};
     juce::Label messageLabel_;
     bool waiting_ = false;
 

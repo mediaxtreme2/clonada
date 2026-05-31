@@ -47,6 +47,11 @@ LicensePanel::LicensePanel(LicenseClient& client) : client_(client) {
     messageLabel_.setColour(juce::Label::textColourId, juce::Colour(kTextDim));
     addAndMakeVisible(messageLabel_);
 
+    closeButton_.setColour(juce::TextButton::buttonColourId, juce::Colours::transparentBlack);
+    closeButton_.setColour(juce::TextButton::textColourOffId, juce::Colour(kTextDim));
+    closeButton_.onClick = [this] { if (onClose) onClose(); };
+    addAndMakeVisible(closeButton_);
+
     updateUI();
 }
 
@@ -61,6 +66,7 @@ void LicensePanel::paint(juce::Graphics& g) {
 void LicensePanel::resized() {
     auto area = getLocalBounds().reduced(30);
 
+    closeButton_.setBounds(getLocalBounds().removeFromRight(44).removeFromTop(44).reduced(10));
     titleLabel_.setBounds(area.removeFromTop(35));
     area.removeFromTop(8);
     statusLabel_.setBounds(area.removeFromTop(22));

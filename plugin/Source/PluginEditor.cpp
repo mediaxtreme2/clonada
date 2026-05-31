@@ -12,11 +12,7 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
     setResizable(false, false);
 
     // ── Header ──
-    titleLabel_.setText("CLONADA", juce::dontSendNotification);
-    titleLabel_.setFont(juce::FontOptions(20.0f, juce::Font::bold));
-    titleLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kCyanGlow));
-    titleLabel_.setJustificationType(juce::Justification::centredLeft);
-    addAndMakeVisible(titleLabel_);
+    titleLabel_.setVisible(false);
 
     statusDotLabel_.setText(juce::CharPointer_UTF8("\xe2\x97\x8f"), juce::dontSendNotification);
     statusDotLabel_.setFont(juce::FontOptions(13.0f));
@@ -230,6 +226,11 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
         if (showingLicense_) {
             licensePanel_ = std::make_unique<LicensePanel>(processor_.getLicenseClient());
             licensePanel_->onLicenseActivated = [this] { processor_.launchEngine(); };
+            licensePanel_->onClose = [this] {
+                showingLicense_ = false;
+                licensePanel_.reset();
+                repaint();
+            };
             addAndMakeVisible(*licensePanel_);
             licensePanel_->setBounds(getLocalBounds().reduced(160, 130));
         } else {
@@ -546,9 +547,8 @@ void ClonadaEditor::resized() {
 
     // Header (0-54)
     auto header = area.removeFromTop(54).reduced(14, 0);
-    titleLabel_.setBounds(header.removeFromLeft(140).withTrimmedTop(14).withHeight(26));
     statusDotLabel_.setBounds(header.removeFromLeft(18).withTrimmedTop(18).withHeight(18));
-    statusLabel_.setBounds(header.removeFromLeft(220).withTrimmedTop(16));
+    statusLabel_.setBounds(header.removeFromLeft(280).withTrimmedTop(16));
     versionLabel_.setBounds(header.withTrimmedTop(18));
 
     // Preset row (48-82)
