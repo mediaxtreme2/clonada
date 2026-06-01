@@ -164,6 +164,27 @@ jobs:
             echo "Signed DMG"
           fi
 
+      - name: Notarize macOS DMG
+        if: runner.os == 'macOS'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          DMG="Clonada-${{ github.event.inputs.version }}-macOS.dmg"
+          echo "Submitting $DMG for notarization..."
+          xcrun notarytool submit "$DMG" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait --timeout 15m
+
+          echo "Stapling notarization ticket to DMG..."
+          xcrun stapler staple "$DMG"
+          echo "Notarization complete!"
+
+          xcrun stapler validate "$DMG"
+
       - name: Create Windows installer package
         if: runner.os == 'Windows'
         shell: bash
@@ -255,7 +276,7 @@ jobs:
 
             ### What's New
             - **Single-step installer** — macOS users now just double-click "Install Clonada.command" and everything sets up automatically (plugins + AI engine)
-            - Apple code-signed binaries (no Gatekeeper warnings)
+            - Apple code-signed and notarized binaries (zero Gatekeeper warnings)
 
             ### Downloads
             | Platform | Installer | Manual |
