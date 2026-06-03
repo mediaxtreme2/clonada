@@ -27,9 +27,41 @@ sys.path.insert(0, os.path.dirname(__file__))
 from lib.license_client import validate, activate, deactivate, has_feature
 
 RUNPOD_ENDPOINT_ID = "lmxzg81itmh3on"
-RUNPOD_API_KEY = os.environ.get("RUNPOD_API_KEY", "")
 RUNPOD_BASE = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}"
 LICENSE_SERVER = "http://155.133.27.205/api"
+
+
+def _load_runpod_key():
+    """Load RunPod API key from config file, environment, or license server."""
+    env_key = os.environ.get("RUNPOD_API_KEY", "")
+    if env_key:
+        return env_key
+    config_path = os.path.join(os.path.expanduser("~"), "Clonada", "config.json")
+    if os.path.exists(config_path):
+        try:
+            with open(config_path) as f:
+                cfg = json.load(f)
+                if cfg.get("runpod_api_key"):
+                    return cfg["runpod_api_key"]
+        except:
+            pass
+    # Fetch from license server
+    try:
+        resp = requests.get(f"{LICENSE_SERVER}/cloud-config", timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            key = data.get("runpod_api_key", "")
+            if key:
+                os.makedirs(os.path.dirname(config_path), exist_ok=True)
+                with open(config_path, "w") as f:
+                    json.dump({"runpod_api_key": key}, f)
+                return key
+    except:
+        pass
+    return ""
+
+
+RUNPOD_API_KEY = _load_runpod_key()
 
 
 class ClonadaCloudBridge:
