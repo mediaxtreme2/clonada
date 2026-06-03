@@ -74,7 +74,14 @@ jobs:
 
           echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> $GITHUB_ENV
           echo "SIGNING_IDENTITY=Developer ID Application: mediaXtreme LLC (DBJC3A73UV)" >> $GITHUB_ENV
-          echo "INSTALLER_IDENTITY=Developer ID Installer: mediaXtreme LLC (DBJC3A73UV)" >> $GITHUB_ENV
+
+          # Only set INSTALLER_IDENTITY if the installer cert is actually in the keychain
+          if security find-identity -v -p basic "$KEYCHAIN_PATH" | grep -q "Developer ID Installer"; then
+            echo "INSTALLER_IDENTITY=Developer ID Installer: mediaXtreme LLC (DBJC3A73UV)" >> $GITHUB_ENV
+          else
+            echo "WARNING: Developer ID Installer certificate not found - pkg will be unsigned"
+            echo "INSTALLER_IDENTITY=" >> $GITHUB_ENV
+          fi
 
       - name: Build Cloud Engine binary (macOS)
         if: runner.os == 'macOS'
