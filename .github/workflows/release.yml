@@ -79,13 +79,16 @@ jobs:
       - name: Build Cloud Engine binary (macOS)
         if: runner.os == 'macOS'
         run: |
+          brew install libsndfile
           python3 -m pip install --quiet pyzmq requests numpy soundfile pyinstaller
           cd python
           pyinstaller --onefile --name clonada-engine \
             --hidden-import zmq \
             --hidden-import numpy \
             --hidden-import soundfile \
+            --hidden-import _soundfile_data \
             --hidden-import requests \
+            --collect-all soundfile \
             --add-data "lib/license_client.py:lib" \
             --add-data "lib/__init__.py:lib" \
             --exclude-module torch \
