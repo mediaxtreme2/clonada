@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g., 1.2.0)'
+        description: 'Release version (e.g., 1.7.0)'
         required: true
-        default: '1.2.0'
+        default: '1.7.0'
 
 permissions:
   contents: write
@@ -74,34 +74,235 @@ jobs:
 
           echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> $GITHUB_ENV
           echo "SIGNING_IDENTITY=Developer ID Application: mediaXtreme LLC (DBJC3A73UV)" >> $GITHUB_ENV
+          echo "INSTALLER_IDENTITY=Developer ID Installer: mediaXtreme LLC (DBJC3A73UV)" >> $GITHUB_ENV
 
-      - name: Create macOS DMG with unified installer
+      - name: Build Cloud Engine binary (macOS)
         if: runner.os == 'macOS'
         run: |
-          mkdir -p dist/Clonada/python/lib
+          python3 -m pip install --quiet pyzmq requests numpy soundfile pyinstaller
+          cd python
+          pyinstaller --onefile --name clonada-engine \
+            --hidden-import zmq \
+            --hidden-import numpy \
+            --hidden-import soundfile \
+            --hidden-import requests \
+            --add-data "lib/license_client.py:lib" \
+            --add-data "lib/__init__.py:lib" \
+            --exclude-module torch \
+            --exclude-module torchaudio \
+            --exclude-module demucs \
+            --exclude-module fairseq \
+            --exclude-module matplotlib \
+            --exclude-module tkinter \
+            --strip \
+            --noupx \
+            clonada_cloud_bridge.py
+          echo "Cloud engine binary built: $(ls -lh dist/clonada-engine)"
+
+      - name: Build Cloud Engine binary (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          python -m pip install --quiet pyzmq requests numpy soundfile pyinstaller
+          cd python
+          pyinstaller --onefile --name clonada-engine `
+            --hidden-import zmq `
+            --hidden-import numpy `
+            --hidden-import soundfile `
+            --hidden-import requests `
+            --add-data "lib/license_client.py;lib" `
+            --add-data "lib/__init__.py;lib" `
+            --exclude-module torch `
+            --exclude-module torchaudio `
+            --exclude-module demucs `
+            --exclude-module fairseq `
+            --exclude-module matplotlib `
+            --exclude-module tkinter `
+            --strip `
+            clonada_cloud_bridge.py
+          Write-Host "Cloud engine binary built"
+
+      - name: Create macOS .pkg installer
+        if: runner.os == 'macOS'
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          PKG_ROOT="/tmp/clonada-pkg-root"
+          SCRIPTS_DIR="/tmp/clonada-pkg-scripts"
+          rm -rf "$PKG_ROOT" "$SCRIPTS_DIR"
+
+          # Create directory structure for pkg payload
+          mkdir -p "$PKG_ROOT/Library/Audio/Plug-Ins/VST3"
+          mkdir -p "$PKG_ROOT/Library/Audio/Plug-Ins/Components"
+          mkdir -p "$PKG_ROOT/Library/Audio/Plug-Ins/CLAP"
+          mkdir -p "$PKG_ROOT/Applications"
+          mkdir -p "$PKG_ROOT/usr/local/bin"
 
           # Copy plugin binaries
-          cp -r plugin/build/Clonada_artefacts/Release/VST3/Clonada.vst3 dist/Clonada/ 2>/dev/null || true
-          cp -r plugin/build/Clonada_artefacts/Release/AU/Clonada.component dist/Clonada/ 2>/dev/null || true
-          cp -r plugin/build/Clonada_artefacts/Release/CLAP/Clonada.clap dist/Clonada/ 2>/dev/null || true
-          cp -r plugin/build/Clonada_artefacts/Release/Standalone/Clonada.app dist/Clonada/ 2>/dev/null || true
+          BUILD_DIR="plugin/build/Clonada_artefacts/Release"
+          cp -R "$BUILD_DIR/VST3/Clonada.vst3" "$PKG_ROOT/Library/Audio/Plug-Ins/VST3/" 2>/dev/null || true
+          cp -R "$BUILD_DIR/AU/Clonada.component" "$PKG_ROOT/Library/Audio/Plug-Ins/Components/" 2>/dev/null || true
+          cp "$BUILD_DIR/CLAP/Clonada.clap" "$PKG_ROOT/Library/Audio/Plug-Ins/CLAP/" 2>/dev/null || true
+          cp -R "$BUILD_DIR/Standalone/Clonada.app" "$PKG_ROOT/Applications/" 2>/dev/null || true
 
-          # Copy Python engine
-          cp python/*.py dist/Clonada/python/
-          cp python/requirements.txt dist/Clonada/python/
-          cp python/lib/*.py dist/Clonada/python/lib/
+          # Copy cloud engine binary
+          cp python/dist/clonada-engine "$PKG_ROOT/usr/local/bin/clonada-engine"
+          chmod +x "$PKG_ROOT/usr/local/bin/clonada-engine"
 
-          # Copy unified installer (this IS the single-step installer)
-          cp installer/install_macos.sh dist/Clonada/
+          # Code sign all binaries
+          if [ -n "$SIGNING_IDENTITY" ]; then
+            for target in \
+              "$PKG_ROOT/Library/Audio/Plug-Ins/VST3/Clonada.vst3" \
+              "$PKG_ROOT/Library/Audio/Plug-Ins/Components/Clonada.component" \
+              "$PKG_ROOT/Library/Audio/Plug-Ins/CLAP/Clonada.clap" \
+              "$PKG_ROOT/Applications/Clonada.app" \
+              "$PKG_ROOT/usr/local/bin/clonada-engine"; do
+              if [ -e "$target" ]; then
+                codesign --force --deep --sign "$SIGNING_IDENTITY" \
+                  --options runtime --timestamp "$target"
+                echo "Signed: $target"
+              fi
+            done
+          fi
+
+          # Create postinstall script
+          mkdir -p "$SCRIPTS_DIR"
+          cat > "$SCRIPTS_DIR/postinstall" << 'POSTINSTALL'
+          #!/bin/bash
+          # Post-install: set up user directories and LaunchAgent
+          USER_HOME=$(eval echo ~$USER)
+          CLONADA_HOME="$USER_HOME/Clonada"
+
+          mkdir -p "$CLONADA_HOME/models"
+          mkdir -p "$USER_HOME/Library/Application Support/Clonada/Presets"
+
+          # Create symlink for easy access
+          ln -sf /usr/local/bin/clonada-engine "$CLONADA_HOME/clonada-engine"
+
+          # Create a convenience launcher
+          cat > "$CLONADA_HOME/start_engine.sh" << 'EOF'
+          #!/bin/bash
+          DIR="$(cd "$(dirname "$0")" && pwd)"
+          /usr/local/bin/clonada-engine --models-dir "$DIR/models" "$@"
+          EOF
+          chmod +x "$CLONADA_HOME/start_engine.sh"
+
+          # Remove quarantine from all installed components
+          xattr -rd com.apple.quarantine "/Library/Audio/Plug-Ins/VST3/Clonada.vst3" 2>/dev/null || true
+          xattr -rd com.apple.quarantine "$USER_HOME/Library/Audio/Plug-Ins/VST3/Clonada.vst3" 2>/dev/null || true
+          xattr -rd com.apple.quarantine "/Library/Audio/Plug-Ins/Components/Clonada.component" 2>/dev/null || true
+          xattr -rd com.apple.quarantine "$USER_HOME/Library/Audio/Plug-Ins/Components/Clonada.component" 2>/dev/null || true
+          xattr -rd com.apple.quarantine "/Library/Audio/Plug-Ins/CLAP/Clonada.clap" 2>/dev/null || true
+          xattr -rd com.apple.quarantine "$USER_HOME/Library/Audio/Plug-Ins/CLAP/Clonada.clap" 2>/dev/null || true
+          xattr -rd com.apple.quarantine "/Applications/Clonada.app" 2>/dev/null || true
+          xattr -rd com.apple.quarantine /usr/local/bin/clonada-engine 2>/dev/null || true
+
+          echo "Clonada installation complete!"
+          exit 0
+          POSTINSTALL
+          chmod +x "$SCRIPTS_DIR/postinstall"
+
+          # Build the component package
+          pkgbuild \
+            --root "$PKG_ROOT" \
+            --scripts "$SCRIPTS_DIR" \
+            --identifier "com.mediaxtreme.clonada" \
+            --version "$VERSION" \
+            --install-location "/" \
+            "/tmp/clonada-component.pkg"
+
+          # Create distribution XML for productbuild
+          cat > /tmp/distribution.xml << DISTXML
+          <?xml version="1.0" encoding="utf-8"?>
+          <installer-gui-script minSpecVersion="2">
+              <title>Clonada AI Vocal Suite</title>
+              <organization>com.mediaxtreme</organization>
+              <domains enable_localSystem="true"/>
+              <options customize="never" require-scripts="true" rootVolumeOnly="true"/>
+              <welcome file="welcome.html"/>
+              <license file="license.txt"/>
+              <pkg-ref id="com.mediaxtreme.clonada"/>
+              <choices-outline>
+                  <line choice="default">
+                      <line choice="com.mediaxtreme.clonada"/>
+                  </line>
+              </choices-outline>
+              <choice id="default"/>
+              <choice id="com.mediaxtreme.clonada" visible="false">
+                  <pkg-ref id="com.mediaxtreme.clonada"/>
+              </choice>
+              <pkg-ref id="com.mediaxtreme.clonada" version="$VERSION">#clonada-component.pkg</pkg-ref>
+          </installer-gui-script>
+          DISTXML
+
+          # Create welcome HTML
+          mkdir -p /tmp/clonada-resources
+          cat > /tmp/clonada-resources/welcome.html << WELCOME
+          <html>
+          <body style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 20px;">
+          <h1 style="color: #7c3aed;">Clonada AI Vocal Suite</h1>
+          <p style="font-size: 14px; line-height: 1.6;">
+          Welcome! This installer will set up:
+          </p>
+          <ul style="font-size: 14px; line-height: 1.8;">
+          <li><strong>VST3, Audio Unit, and CLAP</strong> plugins for your DAW</li>
+          <li><strong>Standalone app</strong> in Applications</li>
+          <li><strong>Cloud AI Engine</strong> for voice conversion (no local GPU needed)</li>
+          </ul>
+          <p style="font-size: 14px; color: #666;">
+          After installation, open your DAW, rescan plugins, and load Clonada on a vocal track.
+          Enter your license key and you're ready to go!
+          </p>
+          <p style="font-size: 12px; color: #999; margin-top: 20px;">
+          Version $VERSION | by mediaXtreme LLC
+          </p>
+          </body>
+          </html>
+          WELCOME
+
+          cp installer/license.txt /tmp/clonada-resources/
+
+          # Build the final signed product package
+          if [ -n "$INSTALLER_IDENTITY" ]; then
+            productbuild \
+              --distribution /tmp/distribution.xml \
+              --resources /tmp/clonada-resources \
+              --package-path /tmp \
+              --sign "$INSTALLER_IDENTITY" \
+              "Clonada-${VERSION}-macOS.pkg"
+          else
+            productbuild \
+              --distribution /tmp/distribution.xml \
+              --resources /tmp/clonada-resources \
+              --package-path /tmp \
+              "Clonada-${VERSION}-macOS.pkg"
+          fi
+
+          echo "PKG created: Clonada-${VERSION}-macOS.pkg ($(du -h "Clonada-${VERSION}-macOS.pkg" | cut -f1))"
+
+      - name: Also create DMG (legacy)
+        if: runner.os == 'macOS'
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          mkdir -p dist/Clonada/python/lib
+
+          BUILD_DIR="plugin/build/Clonada_artefacts/Release"
+          cp -r "$BUILD_DIR/VST3/Clonada.vst3" dist/Clonada/ 2>/dev/null || true
+          cp -r "$BUILD_DIR/AU/Clonada.component" dist/Clonada/ 2>/dev/null || true
+          cp "$BUILD_DIR/CLAP/Clonada.clap" dist/Clonada/ 2>/dev/null || true
+          cp -r "$BUILD_DIR/Standalone/Clonada.app" dist/Clonada/ 2>/dev/null || true
+
+          # Include cloud engine binary
+          cp python/dist/clonada-engine dist/Clonada/
+          chmod +x dist/Clonada/clonada-engine
+
+          # Copy installer script
+          cp installer/install_macos_cloud.sh dist/Clonada/install_macos.sh
           chmod +x dist/Clonada/install_macos.sh
 
-          # Copy license
           cp installer/license.txt dist/Clonada/
 
-          # Create the .command wrapper that users double-click in Finder
           cat > "dist/Clonada/Install Clonada.command" << 'CMDEOF'
           #!/bin/bash
-          # Wrapper so users can double-click in Finder
           SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
           cd "$SCRIPT_DIR"
           bash "$SCRIPT_DIR/install_macos.sh"
@@ -111,79 +312,57 @@ jobs:
           CMDEOF
           chmod +x "dist/Clonada/Install Clonada.command"
 
-          cat > dist/Clonada/README.txt << EOF
-          CLONADA AI VOCAL SUITE v${{ github.event.inputs.version }}
-          ============================================
-
-          ONE-STEP INSTALL:
-            Double-click "Install Clonada.command"
-
-          That's it! The installer will:
-            1. Copy plugins (VST3, AU, CLAP) to your DAW folders
-            2. Install the standalone app to Applications
-            3. Set up the Python AI engine automatically
-            4. Create all necessary directories
-
-          After installation:
-            1. Open your DAW and rescan plugins
-            2. Load Clonada on a vocal track
-            3. Enter your license key
-            4. AI models download automatically on first use (~200 MB)
-
-          To uninstall: bash ~/Clonada/uninstall.sh
-
-          Requirements:
-            - macOS 12+ (Apple Silicon native support)
-            - 8 GB RAM minimum
-            - Internet connection for setup and model downloads
-          EOF
-
-          # Code sign all binaries
+          # Sign binaries
           if [ -n "$SIGNING_IDENTITY" ]; then
-            echo "Signing with: $SIGNING_IDENTITY"
             for target in \
               "dist/Clonada/Clonada.vst3" \
               "dist/Clonada/Clonada.component" \
               "dist/Clonada/Clonada.clap" \
-              "dist/Clonada/Clonada.app"; do
+              "dist/Clonada/Clonada.app" \
+              "dist/Clonada/clonada-engine"; do
               if [ -e "$target" ]; then
                 codesign --force --deep --sign "$SIGNING_IDENTITY" \
                   --options runtime --timestamp "$target"
-                echo "Signed: $target"
               fi
             done
           fi
 
           hdiutil create -volname "Clonada" -srcfolder dist/Clonada -ov -format UDZO \
-            "Clonada-${{ github.event.inputs.version }}-macOS.dmg"
+            "Clonada-${VERSION}-macOS.dmg"
 
-          # Sign the DMG itself
           if [ -n "$SIGNING_IDENTITY" ]; then
             codesign --force --sign "$SIGNING_IDENTITY" --timestamp \
-              "Clonada-${{ github.event.inputs.version }}-macOS.dmg"
-            echo "Signed DMG"
+              "Clonada-${VERSION}-macOS.dmg"
           fi
 
-      - name: Notarize macOS DMG
+      - name: Notarize macOS installers
         if: runner.os == 'macOS'
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          DMG="Clonada-${{ github.event.inputs.version }}-macOS.dmg"
-          echo "Submitting $DMG for notarization..."
+          VERSION="${{ github.event.inputs.version }}"
+
+          # Notarize PKG
+          PKG="Clonada-${VERSION}-macOS.pkg"
+          echo "Notarizing $PKG..."
+          xcrun notarytool submit "$PKG" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait --timeout 15m || echo "PKG notarization failed (non-fatal)"
+          xcrun stapler staple "$PKG" || true
+
+          # Notarize DMG
+          DMG="Clonada-${VERSION}-macOS.dmg"
+          echo "Notarizing $DMG..."
           xcrun notarytool submit "$DMG" \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_APP_SPECIFIC_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
-            --wait --timeout 15m
-
-          echo "Stapling notarization ticket to DMG..."
-          xcrun stapler staple "$DMG"
-          echo "Notarization complete!"
-
-          xcrun stapler validate "$DMG"
+            --wait --timeout 15m || echo "DMG notarization failed (non-fatal)"
+          xcrun stapler staple "$DMG" || true
 
       - name: Create Windows installer package
         if: runner.os == 'Windows'
@@ -193,7 +372,7 @@ jobs:
           cp -r plugin/build/Clonada_artefacts/Release/VST3/Clonada.vst3 dist/Clonada/ 2>/dev/null || true
           cp -r plugin/build/Clonada_artefacts/Release/CLAP/Clonada.clap dist/Clonada/ 2>/dev/null || true
           cp -r plugin/build/Clonada_artefacts/Release/Standalone/Clonada.exe dist/Clonada/ 2>/dev/null || true
-          cp installer/install_windows.bat dist/Clonada/
+          cp python/dist/clonada-engine.exe dist/Clonada/ 2>/dev/null || true
           cp installer/license.txt dist/Clonada/
 
       - name: Build Windows Inno Setup installer
@@ -209,6 +388,14 @@ jobs:
           if [ -f "$KEYCHAIN_PATH" ]; then
             security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
           fi
+
+      - name: Upload macOS PKG
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: clonada-macos-pkg
+          path: "Clonada-${{ github.event.inputs.version }}-macOS.pkg"
+          retention-days: 30
 
       - name: Upload macOS DMG
         if: runner.os == 'macOS'
@@ -244,6 +431,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Download macOS PKG
+        uses: actions/download-artifact@v4
+        with:
+          name: clonada-macos-pkg
+          path: release/
+
       - name: Download macOS DMG
         uses: actions/download-artifact@v4
         with:
@@ -274,37 +467,47 @@ jobs:
           body: |
             ## Clonada AI Vocal Suite v${{ github.event.inputs.version }}
 
-            ### What's New
-            - **Single-step installer** — macOS users now just double-click "Install Clonada.command" and everything sets up automatically (plugins + AI engine)
-            - Apple code-signed and notarized binaries (zero Gatekeeper warnings)
+            ### What's New — Cloud Edition
+            - **TRUE ONE-CLICK INSTALL** — macOS .pkg installer. Double-click, click Install, done. No Terminal, no Python, no manual steps.
+            - **Cloud AI Engine** — Voice conversion runs on cloud GPU. No PyTorch download, no 2GB setup. Works instantly after install.
+            - **Zero Gatekeeper issues** — Fully code-signed and Apple-notarized. No "unidentified developer" warnings.
+            - **Standalone engine binary** — Pre-compiled AI engine. No Python, no Conda, no pip. Just works.
 
             ### Downloads
-            | Platform | Installer | Manual |
-            |----------|-----------|--------|
-            | Windows  | `.exe` Setup (recommended) | `.zip` archive |
-            | macOS    | `.dmg` Disk Image | - |
+            | Platform | Recommended | Legacy |
+            |----------|-------------|--------|
+            | macOS    | `.pkg` Installer (one-click) | `.dmg` Disk Image |
+            | Windows  | `.exe` Setup | `.zip` archive |
+
+            ### Installation
+
+            **macOS (RECOMMENDED):** Download the `.pkg` file. Double-click it. Click "Continue" then "Install". That's it — plugins, app, and AI engine all set up in 30 seconds. No Terminal needed.
+
+            **macOS (Legacy DMG):** Open the `.dmg`, double-click "Install Clonada.command".
+
+            **Windows:** Run the `.exe` installer.
+
+            After installing, open your DAW, rescan plugins, load Clonada, enter your license key. Ready to go!
 
             ### Plugin Formats
-            - **VST3** — Windows, macOS (Ableton, FL Studio, Cubase, Pro Tools, etc.)
+            - **VST3** — Windows, macOS (Ableton, FL Studio, Cubase, Pro Tools, REAPER, etc.)
             - **Audio Unit** — macOS only (Logic Pro, GarageBand)
             - **CLAP** — Windows, macOS (Bitwig, REAPER)
             - **Standalone** — Windows, macOS
 
-            ### Installation
-            **macOS:** Open the `.dmg`, double-click "Install Clonada.command" — that's it! Plugins, standalone app, and AI engine all set up in one step. Takes 5-15 minutes for the AI engine download.
-
-            **Windows:** Run the `.exe` installer. Select "Full installation" to include the AI engine, or "Plugin only" for just the VST3/CLAP files.
-
-            After installing, activate with your license key on first plugin launch. AI models (~200MB) download automatically on first use.
-
-            ### License Keys
-            Each license supports up to 5 device activations. Keys are platform-independent — one key works on both Windows and macOS.
+            ### Cloud Engine
+            Voice conversion now runs on cloud GPU by default. This means:
+            - No local GPU required
+            - No PyTorch/CUDA installation
+            - Works on any Mac (Intel or Apple Silicon)
+            - ~2-5 second processing time per clip
 
             ### Requirements
             - Windows 10+ (64-bit) or macOS 12+ (Apple Silicon native)
-            - 8 GB RAM minimum
-            - Internet connection for license activation, model download, and cloud training
+            - 4 GB RAM minimum
+            - Internet connection for license activation and voice conversion
           files: |
+            release/Clonada-${{ github.event.inputs.version }}-macOS.pkg
             release/Clonada-${{ github.event.inputs.version }}-macOS.dmg
             release/Clonada-${{ github.event.inputs.version }}-Windows-Setup.exe
             release/Clonada-${{ github.event.inputs.version }}-Windows.zip
