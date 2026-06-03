@@ -80,7 +80,9 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew install libsndfile
-          python3 -m pip install --quiet pyzmq requests numpy soundfile pyinstaller
+          python3 -m venv /tmp/clonada-venv
+          source /tmp/clonada-venv/bin/activate
+          pip install --quiet pyzmq requests numpy soundfile pyinstaller
           cd python
           pyinstaller --onefile --name clonada-engine \
             --hidden-import zmq \
