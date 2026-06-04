@@ -176,8 +176,33 @@ jobs:
             done
           fi
 
-          # Create postinstall script
+          # Create preinstall script to remove old versions
           mkdir -p "$SCRIPTS_DIR"
+          cat > "$SCRIPTS_DIR/preinstall" << 'PREINSTALL'
+          #!/bin/bash
+          # Remove any existing Clonada installation to prevent version conflicts
+          rm -rf "/Library/Audio/Plug-Ins/VST3/Clonada.vst3" 2>/dev/null || true
+          rm -rf "/Library/Audio/Plug-Ins/Components/Clonada.component" 2>/dev/null || true
+          rm -rf "/Library/Audio/Plug-Ins/CLAP/Clonada.clap" 2>/dev/null || true
+          rm -rf "/Applications/Clonada.app" 2>/dev/null || true
+          rm -f /usr/local/bin/clonada-engine 2>/dev/null || true
+          # Also clean user-level plugin dirs
+          for USER_DIR in /Users/*/Library/Audio/Plug-Ins; do
+            rm -rf "$USER_DIR/VST3/Clonada.vst3" 2>/dev/null || true
+            rm -rf "$USER_DIR/Components/Clonada.component" 2>/dev/null || true
+            rm -rf "$USER_DIR/CLAP/Clonada.clap" 2>/dev/null || true
+          done
+          # Clear AudioUnit cache so DAW picks up new version
+          for USER_DIR in /Users/*/Library/Caches; do
+            rm -rf "$USER_DIR/AudioUnitCache" 2>/dev/null || true
+            rm -rf "$USER_DIR/com.apple.audiounits.cache" 2>/dev/null || true
+          done
+          echo "Old Clonada version removed"
+          exit 0
+          PREINSTALL
+          chmod +x "$SCRIPTS_DIR/preinstall"
+
+          # Create postinstall script
           cat > "$SCRIPTS_DIR/postinstall" << 'POSTINSTALL'
           #!/bin/bash
           # Post-install: set up user directories and LaunchAgent
