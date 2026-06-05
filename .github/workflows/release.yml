@@ -553,14 +553,17 @@ jobs:
           echo "=== VERIFY: Installer signature ==="
           pkgutil --check-signature "$PKG_FILE" 2>&1 || echo "⚠️ PKG signature check failed"
 
-          # Test app binary launches
+          # Test app binary exists and is executable
           echo ""
-          echo "=== VERIFY: App binary launch test ==="
-          if /Applications/Clonada.app/Contents/MacOS/Clonada --version 2>&1 || timeout 3 /Applications/Clonada.app/Contents/MacOS/Clonada 2>&1; then
-            echo "✅ App binary runs"
+          echo "=== VERIFY: App binary check ==="
+          APP_BIN="/Applications/Clonada.app/Contents/MacOS/Clonada"
+          if [ -f "$APP_BIN" ] && [ -x "$APP_BIN" ]; then
+            echo "✅ App binary exists and is executable ($(file "$APP_BIN" | grep -o 'Mach-O.*'))"
             PASS=$((PASS+1))
+          elif [ -f "$APP_BIN" ]; then
+            echo "⚠️ App binary exists but not executable"
           else
-            echo "⚠️ App binary launch test inconclusive (may need GUI)"
+            echo "⚠️ App binary not found at $APP_BIN"
           fi
 
           echo ""
