@@ -246,17 +246,29 @@ jobs:
           EOF
           chmod +x "$CLONADA_HOME/start_engine.sh"
 
-          # Remove quarantine from all installed components
+          # Remove quarantine from ALL installed components
           xattr -rd com.apple.quarantine "/Library/Audio/Plug-Ins/VST3/Clonada.vst3" 2>/dev/null || true
-          xattr -rd com.apple.quarantine "$USER_HOME/Library/Audio/Plug-Ins/VST3/Clonada.vst3" 2>/dev/null || true
           xattr -rd com.apple.quarantine "/Library/Audio/Plug-Ins/Components/Clonada.component" 2>/dev/null || true
-          xattr -rd com.apple.quarantine "$USER_HOME/Library/Audio/Plug-Ins/Components/Clonada.component" 2>/dev/null || true
           xattr -rd com.apple.quarantine "/Library/Audio/Plug-Ins/CLAP/Clonada.clap" 2>/dev/null || true
-          xattr -rd com.apple.quarantine "$USER_HOME/Library/Audio/Plug-Ins/CLAP/Clonada.clap" 2>/dev/null || true
           xattr -rd com.apple.quarantine "/Applications/Clonada.app" 2>/dev/null || true
           xattr -rd com.apple.quarantine /usr/local/bin/clonada-engine 2>/dev/null || true
+          # Also remove quarantine from user-level dirs
+          for UD in /Users/*/Library/Audio/Plug-Ins; do
+            xattr -rd com.apple.quarantine "$UD/VST3/Clonada.vst3" 2>/dev/null || true
+            xattr -rd com.apple.quarantine "$UD/Components/Clonada.component" 2>/dev/null || true
+          done
 
-          echo "Clonada installation complete!"
+          # Force clear AudioUnit cache so DAW detects new version
+          for UD in /Users/*; do
+            rm -rf "$UD/Library/Caches/AudioUnitCache" 2>/dev/null || true
+            rm -rf "$UD/Library/Caches/com.apple.audiounits.cache" 2>/dev/null || true
+            rm -f "$UD/Library/Preferences/com.apple.audio.InfoHelper.plist" 2>/dev/null || true
+          done
+          # Kill AU validation daemon to force rescan
+          killall -9 "AudioComponentRegistrar" 2>/dev/null || true
+          killall -9 "AUHostingServiceXPC" 2>/dev/null || true
+
+          echo "Clonada v1.7.5 installation complete!"
           exit 0
           POSTINSTALL
           chmod +x "$SCRIPTS_DIR/postinstall"
