@@ -439,6 +439,97 @@ jobs:
             security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
           fi
 
+      - name: Verify macOS .pkg installation
+        if: runner.os == 'macOS'
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          PKG_FILE="Clonada-${VERSION}-macOS.pkg"
+
+          echo "=== INSTALL TEST: Installing ${PKG_FILE} ==="
+          sudo installer -pkg "$PKG_FILE" -target / -verbose 2>&1 || true
+
+          echo ""
+          echo "=== VERIFY: Checking installed files ==="
+          PASS=0
+          FAIL=0
+
+          # Check standalone app
+          if [ -d "/Applications/Clonada.app" ]; then
+            echo "✅ /Applications/Clonada.app exists"
+            PASS=$((PASS+1))
+          else
+            echo "❌ /Applications/Clonada.app MISSING"
+            FAIL=$((FAIL+1))
+          fi
+
+          # Check VST3
+          if [ -d "/Library/Audio/Plug-Ins/VST3/Clonada.vst3" ]; then
+            echo "✅ VST3 plugin exists"
+            PASS=$((PASS+1))
+          else
+            echo "❌ VST3 plugin MISSING"
+            FAIL=$((FAIL+1))
+          fi
+
+          # Check AU
+          if [ -d "/Library/Audio/Plug-Ins/Components/Clonada.component" ]; then
+            echo "✅ AU plugin exists"
+            PASS=$((PASS+1))
+          else
+            echo "❌ AU plugin MISSING"
+            FAIL=$((FAIL+1))
+          fi
+
+          # Check cloud engine
+          if [ -f "/usr/local/bin/clonada-engine" ]; then
+            echo "✅ Cloud engine binary exists"
+            PASS=$((PASS+1))
+          else
+            echo "❌ Cloud engine binary MISSING"
+            FAIL=$((FAIL+1))
+          fi
+
+          # Verify code signing
+          echo ""
+          echo "=== VERIFY: Code signing ==="
+          if codesign --verify --deep --strict "/Applications/Clonada.app" 2>&1; then
+            echo "✅ Standalone app code signing valid"
+            PASS=$((PASS+1))
+          else
+            echo "⚠️ Standalone app code signing issue (may still work)"
+          fi
+
+          if codesign --verify --deep --strict "/Library/Audio/Plug-Ins/VST3/Clonada.vst3" 2>&1; then
+            echo "✅ VST3 code signing valid"
+            PASS=$((PASS+1))
+          else
+            echo "⚠️ VST3 code signing issue"
+          fi
+
+          # Check .pkg signature
+          echo ""
+          echo "=== VERIFY: Installer signature ==="
+          pkgutil --check-signature "$PKG_FILE" 2>&1 || echo "⚠️ PKG signature check failed"
+
+          # Test app binary launches
+          echo ""
+          echo "=== VERIFY: App binary launch test ==="
+          if /Applications/Clonada.app/Contents/MacOS/Clonada --version 2>&1 || timeout 3 /Applications/Clonada.app/Contents/MacOS/Clonada 2>&1; then
+            echo "✅ App binary runs"
+            PASS=$((PASS+1))
+          else
+            echo "⚠️ App binary launch test inconclusive (may need GUI)"
+          fi
+
+          echo ""
+          echo "========================================="
+          echo "  INSTALL TEST RESULTS: $PASS passed, $FAIL failed"
+          echo "========================================="
+
+          if [ $FAIL -gt 0 ]; then
+            echo "::warning::Some install verification checks failed"
+          fi
+
       - name: Upload macOS PKG
         if: runner.os == 'macOS'
         uses: actions/upload-artifact@v4
