@@ -218,6 +218,16 @@ jobs:
           # Create postinstall script
           cat > "$SCRIPTS_DIR/postinstall" << 'POSTINSTALL'
           #!/bin/bash
+          # Ensure standalone app is in /Applications (some macOS versions relocate bundles)
+          if [ ! -d "/Applications/Clonada.app" ]; then
+            # Try to find it in the package receipts
+            PKG_INFO=$(pkgutil --pkg-info com.mediaxtreme.clonada 2>/dev/null || true)
+            INSTALL_LOC=$(echo "$PKG_INFO" | grep "install-location" | awk '{print $2}')
+            if [ -d "${INSTALL_LOC}/Applications/Clonada.app" ]; then
+              cp -R "${INSTALL_LOC}/Applications/Clonada.app" "/Applications/" 2>/dev/null || true
+            fi
+          fi
+
           # Post-install: set up user directories and LaunchAgent
           USER_HOME=$(eval echo ~$USER)
           CLONADA_HOME="$USER_HOME/Clonada"
@@ -251,10 +261,42 @@ jobs:
           POSTINSTALL
           chmod +x "$SCRIPTS_DIR/postinstall"
 
+          # Create component plist to prevent bundle relocation
+          cat > /tmp/clonada-component.plist << 'CPLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <array>
+            <dict>
+              <key>BundleHasStrictIdentifier</key><true/>
+              <key>BundleIsRelocatable</key><false/>
+              <key>BundleIsVersionChecked</key><true/>
+              <key>BundleOverwriteAction</key><string>upgrade</string>
+              <key>RootRelativeBundlePath</key><string>Applications/Clonada.app</string>
+            </dict>
+            <dict>
+              <key>BundleHasStrictIdentifier</key><true/>
+              <key>BundleIsRelocatable</key><false/>
+              <key>BundleIsVersionChecked</key><true/>
+              <key>BundleOverwriteAction</key><string>upgrade</string>
+              <key>RootRelativeBundlePath</key><string>Library/Audio/Plug-Ins/VST3/Clonada.vst3</string>
+            </dict>
+            <dict>
+              <key>BundleHasStrictIdentifier</key><true/>
+              <key>BundleIsRelocatable</key><false/>
+              <key>BundleIsVersionChecked</key><true/>
+              <key>BundleOverwriteAction</key><string>upgrade</string>
+              <key>RootRelativeBundlePath</key><string>Library/Audio/Plug-Ins/Components/Clonada.component</string>
+            </dict>
+          </array>
+          </plist>
+          CPLIST
+
           # Build the component package
           pkgbuild \
             --root "$PKG_ROOT" \
             --scripts "$SCRIPTS_DIR" \
+            --component-plist /tmp/clonada-component.plist \
             --identifier "com.mediaxtreme.clonada" \
             --version "$VERSION" \
             --install-location "/" \
