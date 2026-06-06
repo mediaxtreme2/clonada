@@ -121,8 +121,14 @@ jobs:
             --exclude-module tkinter \
             --strip \
             --noupx \
+            --codesign-identity "$SIGNING_IDENTITY" \
+            --osx-bundle-identifier "com.mediaxtreme.clonada.engine" \
             clonada_cloud_bridge.py
-          echo "Cloud engine binary built: $(ls -lh dist/clonada-engine)"
+
+          # Deep codesign the engine binary to fix Team ID mismatch
+          codesign --force --deep --sign "$SIGNING_IDENTITY" --options runtime --timestamp dist/clonada-engine
+          echo "Cloud engine binary built and signed: $(ls -lh dist/clonada-engine)"
+          codesign --verify --deep --strict dist/clonada-engine && echo "Engine codesign: VALID" || echo "Engine codesign: INVALID"
 
       - name: Build Cloud Engine binary (Windows)
         if: runner.os == 'Windows'
