@@ -296,12 +296,23 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
         }
         runpodStatusLabel_.setText("Testing connection...", juce::dontSendNotification);
         runpodStatusLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kCyanGlow));
-        auto url = juce::URL("https://api.runpod.io/v2/user");
-        url = url.withExtraHeaders("Authorization: Bearer " + key);
-        std::thread([this, url]() {
-            auto response = url.readEntireTextStream(false);
-            juce::MessageManager::callAsync([this, response]() {
-                if (response.isNotEmpty() && !response.contains("error") && !response.contains("Unauthorized")) {
+        auto apiKey = key;
+        std::thread([this, apiKey]() {
+            juce::URL url("https://api.runpod.io/v2/user");
+            juce::StringPairArray headers;
+            headers.set("Authorization", "Bearer " + apiKey);
+            auto opts = juce::URL::InputStreamOptions(juce::URL::ParameterHandling::inAddress)
+                            .withExtraHeaders("Authorization: Bearer " + apiKey)
+                            .withConnectionTimeoutMs(8000);
+            auto stream = url.createInputStream(opts);
+            bool success = stream != nullptr;
+            juce::String body;
+            if (success) {
+                body = stream->readEntireStreamAsString();
+                success = body.isNotEmpty() && !body.contains("Unauthorized");
+            }
+            juce::MessageManager::callAsync([this, success]() {
+                if (success) {
                     runpodStatusLabel_.setText("Connected to RunPod!", juce::dontSendNotification);
                     runpodStatusLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kGreen));
                 } else {
