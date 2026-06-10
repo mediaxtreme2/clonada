@@ -86,6 +86,7 @@ private:
     juce::Label runpodKeyLabel_{"", "API Key:"};
     juce::TextEditor runpodKeyInput_;
     juce::TextButton runpodSaveButton_{"Save Key"};
+    juce::TextButton runpodTestButton_{"Test Connection"};
     juce::Label runpodStatusLabel_;
 
     // Overlays

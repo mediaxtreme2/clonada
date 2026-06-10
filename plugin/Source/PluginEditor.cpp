@@ -24,7 +24,7 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
     statusLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextGrey));
     addAndMakeVisible(statusLabel_);
 
-    versionLabel_.setText("v1.7.8", juce::dontSendNotification);
+    versionLabel_.setText("v1.7.9", juce::dontSendNotification);
     versionLabel_.setFont(juce::FontOptions(12.0f));
     versionLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextDark));
     versionLabel_.setJustificationType(juce::Justification::centredRight);
@@ -244,7 +244,7 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
     engineInfoLabel_.setFont(juce::FontOptions(13.0f));
     addAndMakeVisible(engineInfoLabel_);
 
-    buildInfoLabel_.setText("Clonada AI Vocal Suite v1.7.8\nmediaXtreme LLC", juce::dontSendNotification);
+    buildInfoLabel_.setText("Clonada AI Vocal Suite v1.7.9\nmediaXtreme LLC", juce::dontSendNotification);
     buildInfoLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextGrey));
     buildInfoLabel_.setFont(juce::FontOptions(14.0f));
     addAndMakeVisible(buildInfoLabel_);
@@ -285,6 +285,34 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
     };
     addAndMakeVisible(runpodSaveButton_);
 
+    runpodTestButton_.setColour(juce::TextButton::buttonColourId, juce::Colour(LnF::kGreen).withAlpha(0.15f));
+    runpodTestButton_.setColour(juce::TextButton::textColourOffId, juce::Colour(LnF::kGreen));
+    runpodTestButton_.onClick = [this] {
+        auto key = runpodKeyInput_.getText().trim();
+        if (key.isEmpty()) {
+            runpodStatusLabel_.setText("Enter API key first", juce::dontSendNotification);
+            runpodStatusLabel_.setColour(juce::Label::textColourId, juce::Colour(0xFFEF4444));
+            return;
+        }
+        runpodStatusLabel_.setText("Testing connection...", juce::dontSendNotification);
+        runpodStatusLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kCyanGlow));
+        auto url = juce::URL("https://api.runpod.io/v2/user");
+        url = url.withExtraHeaders("Authorization: Bearer " + key);
+        std::thread([this, url]() {
+            auto response = url.readEntireTextStream(false);
+            juce::MessageManager::callAsync([this, response]() {
+                if (response.isNotEmpty() && !response.contains("error") && !response.contains("Unauthorized")) {
+                    runpodStatusLabel_.setText("Connected to RunPod!", juce::dontSendNotification);
+                    runpodStatusLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kGreen));
+                } else {
+                    runpodStatusLabel_.setText("Connection failed - check key", juce::dontSendNotification);
+                    runpodStatusLabel_.setColour(juce::Label::textColourId, juce::Colour(0xFFEF4444));
+                }
+            });
+        }).detach();
+    };
+    addAndMakeVisible(runpodTestButton_);
+
     runpodStatusLabel_.setFont(juce::FontOptions(12.0f));
     runpodStatusLabel_.setColour(juce::Label::textColourId, juce::Colour(LnF::kTextDim));
     if (savedKey.isNotEmpty()) {
@@ -310,7 +338,7 @@ ClonadaEditor::ClonadaEditor(ClonadaProcessor& p)
     settingsComponents_ = {
         &licenseButton_, &engineInfoLabel_, &buildInfoLabel_,
         &runpodSectionLabel_, &runpodKeyLabel_, &runpodKeyInput_,
-        &runpodSaveButton_, &runpodStatusLabel_
+        &runpodSaveButton_, &runpodTestButton_, &runpodStatusLabel_
     };
 
     // ── APVTS Attachments ──
@@ -693,6 +721,8 @@ void ClonadaEditor::resized() {
         content.removeFromTop(8);
         auto rpRow = content.removeFromTop(32).reduced(20, 0);
         runpodKeyLabel_.setBounds(rpRow.removeFromLeft(70).withTrimmedTop(4));
+        runpodTestButton_.setBounds(rpRow.removeFromRight(110).withHeight(28).withTrimmedTop(1));
+        rpRow.removeFromRight(4);
         runpodSaveButton_.setBounds(rpRow.removeFromRight(80).withHeight(28).withTrimmedTop(1));
         rpRow.removeFromRight(6);
         runpodKeyInput_.setBounds(rpRow.withHeight(28).withTrimmedTop(1));
