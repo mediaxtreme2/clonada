@@ -20,6 +20,7 @@ private:
     std::atomic<bool> launched_{false};
 
     juce::File findDefaultEnginePath() const;
+    juce::File findEngineBinary() const;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EngineLauncher)
 };

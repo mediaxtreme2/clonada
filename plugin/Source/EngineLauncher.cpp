@@ -35,6 +35,37 @@ juce::File EngineLauncher::findDefaultEnginePath() const {
     return {};
 }
 
+juce::File EngineLauncher::findEngineBinary() const {
+#if JUCE_MAC
+    juce::StringArray binaryPaths = {
+        "/usr/local/bin/clonada-engine",
+        "/opt/homebrew/bin/clonada-engine"
+    };
+    auto home = juce::File::getSpecialLocation(juce::File::userHomeDirectory);
+    binaryPaths.add(home.getChildFile("Clonada/clonada-engine").getFullPathName());
+#elif JUCE_WINDOWS
+    auto home = juce::File::getSpecialLocation(juce::File::userHomeDirectory);
+    juce::StringArray binaryPaths = {
+        "C:/Program Files/Clonada/clonada-engine.exe",
+        home.getChildFile("Clonada/clonada-engine.exe").getFullPathName()
+    };
+    auto appData = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory);
+    binaryPaths.add(appData.getChildFile("Clonada/clonada-engine.exe").getFullPathName());
+#else
+    juce::StringArray binaryPaths = {
+        "/usr/local/bin/clonada-engine",
+        "/opt/clonada/clonada-engine"
+    };
+#endif
+
+    for (auto& path : binaryPaths) {
+        auto f = juce::File(path);
+        if (f.existsAsFile())
+            return f;
+    }
+    return {};
+}
+
 juce::File EngineLauncher::getEnginePath() const {
     return enginePath_;
 }
@@ -43,6 +74,24 @@ bool EngineLauncher::launch() {
     if (launched_.load() && isRunning())
         return true;
 
+    // Try compiled binary first (installed by PKG/EXE installer)
+    auto engineBinary = findEngineBinary();
+    if (engineBinary.existsAsFile()) {
+        process_ = std::make_unique<juce::ChildProcess>();
+        juce::StringArray args;
+        args.add(engineBinary.getFullPathName());
+        args.add("--port");
+        args.add("5050");
+
+        if (process_->start(args, juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr)) {
+            launched_.store(true);
+            juce::Thread::sleep(500);
+            return true;
+        }
+        process_.reset();
+    }
+
+    // Fall back to Python script
     if (!enginePath_.isDirectory())
         return false;
 
@@ -86,7 +135,6 @@ bool EngineLauncher::launch() {
 
     if (process_->start(args, juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr)) {
         launched_.store(true);
-        // Give the engine a moment to start listening
         juce::Thread::sleep(500);
         return true;
     }
