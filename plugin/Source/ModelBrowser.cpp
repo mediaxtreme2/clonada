@@ -60,7 +60,6 @@ ModelBrowser::ModelBrowser(ClonadaProcessor& p) : processor_(p) {
 
     setupButton(trainButton_, ClonadaLookAndFeel::kAmber);
     trainButton_.onClick = [this] {
-        // Cloud training trigger — sends request to RunPod endpoint
         auto& lic = processor_.getLicenseClient();
         if (!lic.isActivated()) {
             juce::AlertWindow::showMessageBoxAsync(
@@ -70,20 +69,74 @@ ModelBrowser::ModelBrowser(ClonadaProcessor& p) : processor_(p) {
             return;
         }
 
+        if (!processor_.isEngineConnected()) {
+            juce::AlertWindow::showMessageBoxAsync(
+                juce::MessageBoxIconType::WarningIcon,
+                "Engine Offline",
+                "The cloud engine must be running to train voices.\nPlease wait for the engine to connect.");
+            return;
+        }
+
         auto chooser = std::make_shared<juce::FileChooser>(
             "Select Training Audio (WAV/MP3)", juce::File(), "*.wav;*.mp3;*.flac");
         chooser->launchAsync(
             juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-            [chooser](const juce::FileChooser& fc) {
-                auto result = fc.getResult();
-                if (!result.existsAsFile()) return;
+            [this, chooser](const juce::FileChooser& fc) {
+                auto audioFile = fc.getResult();
+                if (!audioFile.existsAsFile()) return;
 
-                juce::AlertWindow::showMessageBoxAsync(
-                    juce::MessageBoxIconType::InfoIcon,
-                    "Training Submitted",
-                    "Your voice sample has been queued for cloud training.\n"
-                    "The model will appear in your models folder when ready.\n\n"
-                    "File: " + result.getFileName());
+                auto nameInput = std::make_shared<juce::AlertWindow>(
+                    "Name Your Voice Model",
+                    "Enter a name for this voice clone:\n\nFile: " + audioFile.getFileName(),
+                    juce::MessageBoxIconType::QuestionIcon);
+                nameInput->addTextEditor("name", audioFile.getFileNameWithoutExtension(), "Model Name:");
+                nameInput->addButton("Train", 1);
+                nameInput->addButton("Cancel", 0);
+
+                nameInput->enterModalState(true, juce::ModalCallbackFunction::create(
+                    [this, audioFile, nameInput](int btnResult) {
+                        if (btnResult == 0) return;
+                        auto modelName = nameInput->getTextEditorContents("name").trim();
+                        if (modelName.isEmpty()) modelName = "voice_model";
+
+                        trainButton_.setEnabled(false);
+                        trainButton_.setButtonText("Training...");
+
+                        juce::Thread::launch([this, audioPath = audioFile.getFullPathName(), modelName]() {
+                            auto& bridge = processor_.getBridge();
+
+                            auto escaped = audioPath.replace("\\", "\\\\").replace("\"", "\\\"");
+                            juce::String jsonCmd = "{\"version\":\"1.0.0\",\"command\":\"TRAIN\",\"audio_path\":\""
+                                + escaped + "\",\"model_name\":\"" + modelName + "\"}";
+
+                            auto response = bridge.sendCommandSync(jsonCmd, 1800000);
+
+                            juce::MessageManager::callAsync([this, response, modelName]() {
+                                trainButton_.setEnabled(true);
+                                trainButton_.setButtonText("Train New Voice");
+
+                                if (response.contains("SUCCESS")) {
+                                    refreshModelList();
+                                    juce::AlertWindow::showMessageBoxAsync(
+                                        juce::MessageBoxIconType::InfoIcon,
+                                        "Training Complete",
+                                        "Voice model \"" + modelName + "\" has been trained successfully!\n\n"
+                                        "It's now available in your models list.");
+                                } else {
+                                    juce::String errorMsg = "Unknown error occurred during training.";
+                                    if (response.contains("\"message\"")) {
+                                        auto afterKey = response.fromFirstOccurrenceOf("\"message\"", false, true);
+                                        auto afterColon = afterKey.fromFirstOccurrenceOf("\"", false, true);
+                                        errorMsg = afterColon.upToFirstOccurrenceOf("\"", false, true);
+                                    }
+                                    juce::AlertWindow::showMessageBoxAsync(
+                                        juce::MessageBoxIconType::WarningIcon,
+                                        "Training Failed",
+                                        "Could not train voice model:\n\n" + errorMsg);
+                                }
+                            });
+                        });
+                    }), true);
             });
     };
     addAndMakeVisible(trainButton_);

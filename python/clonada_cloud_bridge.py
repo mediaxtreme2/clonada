@@ -386,6 +386,91 @@ class ClonadaCloudBridge:
         except Exception as e:
             return {"status": "ERROR", "message": str(e)}
 
+    def handle_train(self, message):
+        """Train a new voice model via RunPod cloud GPU."""
+        if not self._check_feature("train"):
+            return {"status": "ERROR", "message": "License required for voice training."}
+
+        audio_path = message.get("audio_path", "")
+        model_name = message.get("model_name", f"voice_{int(time.time())}")
+
+        if not audio_path or not os.path.exists(audio_path):
+            return {"status": "ERROR", "message": f"Audio file not found: {audio_path}"}
+
+        try:
+            print(f"[TRAIN] Reading audio: {audio_path}")
+            audio_data, sr = sf.read(audio_path, dtype="float32")
+            if len(audio_data.shape) > 1:
+                audio_data = audio_data.mean(axis=1)
+
+            duration = len(audio_data) / sr
+            print(f"[TRAIN] Audio: {duration:.1f}s at {sr}Hz, submitting to RunPod...")
+
+            if duration < 30:
+                return {"status": "ERROR", "message": f"Audio too short ({duration:.0f}s). Please provide at least 1 minute of audio for good results."}
+
+            payload = {
+                "mode": "train",
+                "license_key": self._get_license_key(),
+                "model_name": model_name,
+                "audio_data": audio_data.tolist(),
+                "sample_rate": sr,
+                "epochs": 100,
+                "batch_size": 8,
+                "clean_vocals": True,
+            }
+
+            result, err = self._runpod_submit(payload, timeout=1800)
+            if err:
+                return {"status": "ERROR", "message": f"Cloud training failed: {err}"}
+
+            if result and result.get("status") == "COMPLETED":
+                # Try downloading from URL first
+                model_url = result.get("model_url", "")
+                if model_url:
+                    local_model = os.path.join(self.models_dir, f"{model_name}.pth")
+                    print(f"[TRAIN] Downloading model from {model_url}")
+                    try:
+                        resp = requests.get(model_url, timeout=120)
+                        if resp.status_code == 200:
+                            with open(local_model, "wb") as f:
+                                f.write(resp.content)
+                            print(f"[TRAIN] Model saved: {local_model}")
+                            return {
+                                "status": "SUCCESS",
+                                "model_path": local_model,
+                                "model_name": model_name,
+                                "message": f"Training complete. Model saved to {local_model}"
+                            }
+                    except Exception as dl_err:
+                        print(f"[TRAIN] URL download failed: {dl_err}, trying inline data...")
+
+                # Fallback: inline base64-encoded model
+                import base64
+                model_b64 = result.get("model_data", "")
+                if model_b64:
+                    local_model = os.path.join(self.models_dir, f"{model_name}.pth")
+                    with open(local_model, "wb") as f:
+                        f.write(base64.b64decode(model_b64))
+                    print(f"[TRAIN] Model saved from inline data: {local_model}")
+                    return {
+                        "status": "SUCCESS",
+                        "model_path": local_model,
+                        "model_name": model_name,
+                        "message": f"Training complete. Model saved to {local_model}"
+                    }
+
+                return {"status": "ERROR", "message": "Training completed but no model data returned"}
+
+            error_msg = "Training failed"
+            if result:
+                error_msg = result.get("error", error_msg)
+            return {"status": "ERROR", "message": error_msg}
+
+        except Exception as e:
+            print(f"[TRAIN] Error: {e}")
+            return {"status": "ERROR", "message": str(e)}
+
     def process_stream(self):
         """Main event loop."""
         print(f"\n{'='*60}")
@@ -403,6 +488,7 @@ class ClonadaCloudBridge:
             "HEALTH": self.handle_health,
             "ACTIVATE": self.handle_activate,
             "DEACTIVATE": self.handle_deactivate,
+            "TRAIN": self.handle_train,
         }
 
         while self.is_running:

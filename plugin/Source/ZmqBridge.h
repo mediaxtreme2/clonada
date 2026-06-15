@@ -41,6 +41,8 @@ public:
 
     void setOnConnectionChanged(std::function<void(ConnectionState)> cb) { onConnectionChanged_ = std::move(cb); }
 
+    juce::String sendCommandSync(const juce::String& jsonCommand, int timeoutMs = 1800000);
+
 private:
     void run() override;
     void processQueue();
@@ -66,4 +68,6 @@ private:
 
     void* zmqContext_ = nullptr;
     void* zmqSocket_ = nullptr;
+
+    juce::CriticalSection syncLock_;
 };

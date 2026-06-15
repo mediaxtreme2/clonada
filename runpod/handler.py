@@ -20,7 +20,9 @@ import requests
 import runpod
 import torch
 import torchaudio
+import base64
 import numpy as np
+import soundfile as sf
 from pathlib import Path
 
 WORK_DIR = "/tmp/clonada_work"
@@ -468,14 +470,28 @@ def run_training(job_input):
     upload_url = job_input.get("upload_url")
     webhook_url = job_input.get("webhook_url")
 
-    if not dataset_url:
-        return {"status": "FAILED", "error": "Missing dataset_url"}
+    # Support inline audio data (sent from cloud bridge)
+    audio_data_inline = job_input.get("audio_data")
+    raw_dir = None
+    if audio_data_inline and not dataset_url:
+        inline_sr = job_input.get("sample_rate", 44100)
+        raw_dir = os.path.join(WORK_DIR, "raw")
+        os.makedirs(raw_dir, exist_ok=True)
+        audio_np = np.array(audio_data_inline, dtype=np.float32)
+        sf.write(os.path.join(raw_dir, "training_audio.wav"), audio_np, inline_sr)
+        print(f"[TRAIN] Received inline audio: {len(audio_np)/inline_sr:.1f}s at {inline_sr}Hz")
+
+    if not dataset_url and not raw_dir:
+        return {"status": "FAILED", "error": "Missing dataset_url or audio_data"}
 
     experiment_dir = os.path.join(WORK_DIR, "training", model_name)
 
     try:
-        # 1. Download dataset
-        raw_dir = download_dataset(dataset_url, os.path.join(WORK_DIR, "raw"))
+        # 1. Download dataset (skip if inline audio already written)
+        if dataset_url:
+            raw_dir = download_dataset(dataset_url, os.path.join(WORK_DIR, "raw"))
+        elif not raw_dir:
+            raw_dir = os.path.join(WORK_DIR, "raw")
 
         # 2. Optional vocal cleaning
         if clean:
@@ -506,10 +522,18 @@ def run_training(job_input):
             upload_result = upload_results(model_path, index_path, upload_url)
             model_url = f"{upload_url}/{os.path.basename(model_path)}"
 
+        # Base64-encode model for inline transfer (fallback when no upload_url)
+        model_b64 = ""
+        if model_path and os.path.exists(model_path):
+            with open(model_path, "rb") as mf:
+                model_b64 = base64.b64encode(mf.read()).decode()
+            print(f"[TRAIN] Model encoded: {len(model_b64)} chars base64")
+
         result = {
             "status": "COMPLETED",
             "model_name": model_name,
             "model_url": model_url,
+            "model_data": model_b64,
             "epochs_completed": epochs,
             "device": device,
             "upload": upload_result,

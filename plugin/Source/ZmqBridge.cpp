@@ -97,6 +97,49 @@ void ZmqBridge::run() {
     }
 }
 
+juce::String ZmqBridge::sendCommandSync(const juce::String& jsonCommand, int timeoutMs) {
+    juce::ScopedLock lock(syncLock_);
+
+    if (!zmqContext_ || state_.load() != ConnectionState::Connected)
+        return R"({"status":"ERROR","message":"Not connected"})";
+
+    void* syncSocket = zmq_socket(zmqContext_, ZMQ_REQ);
+    if (!syncSocket)
+        return R"({"status":"ERROR","message":"Socket creation failed"})";
+
+    zmq_setsockopt(syncSocket, ZMQ_SNDTIMEO, &timeoutMs, sizeof(timeoutMs));
+    zmq_setsockopt(syncSocket, ZMQ_RCVTIMEO, &timeoutMs, sizeof(timeoutMs));
+    int linger = 0;
+    zmq_setsockopt(syncSocket, ZMQ_LINGER, &linger, sizeof(linger));
+
+    int rc = zmq_connect(syncSocket, endpoint_.toRawUTF8());
+    if (rc != 0) {
+        zmq_close(syncSocket);
+        return R"({"status":"ERROR","message":"Connect failed"})";
+    }
+
+    auto utf8 = jsonCommand.toRawUTF8();
+    rc = zmq_send(syncSocket, utf8, strlen(utf8), 0);
+    if (rc < 0) {
+        zmq_close(syncSocket);
+        return R"({"status":"ERROR","message":"Send failed"})";
+    }
+
+    zmq_msg_t respMsg;
+    zmq_msg_init(&respMsg);
+    rc = zmq_msg_recv(&respMsg, syncSocket, 0);
+    if (rc < 0) {
+        zmq_msg_close(&respMsg);
+        zmq_close(syncSocket);
+        return R"({"status":"ERROR","message":"Receive timeout"})";
+    }
+
+    juce::String result((const char*)zmq_msg_data(&respMsg), (size_t)zmq_msg_size(&respMsg));
+    zmq_msg_close(&respMsg);
+    zmq_close(syncSocket);
+    return result;
+}
+
 void ZmqBridge::processQueue() {
     // Handle model load requests first
     if (modelLoadPending_.load()) {
