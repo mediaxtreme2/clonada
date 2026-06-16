@@ -297,7 +297,7 @@ def train_rvc_v2(experiment_dir, model_name, epochs=100, batch_size=8, sr=40000)
     pretrained_g = os.path.join(WEIGHTS_DIR, "pretrained_v2", "f0G40k.pth")
     if os.path.exists(pretrained_g):
         state = torch.load(pretrained_g, map_location=device, weights_only=False)
-        model.load_state_dict(state.get("model", state), strict=False)
+        model.load_state_dict(state.get("weight", state.get("model", state)), strict=False)
         print("[TRAIN] Loaded pretrained generator weights")
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=0.01)
@@ -368,7 +368,7 @@ def train_rvc_v2(experiment_dir, model_name, epochs=100, batch_size=8, sr=40000)
 
     model_path = os.path.join(output_dir, f"{model_name}.pth")
     torch.save({
-        "model": model.state_dict(),
+        "weight": model.state_dict(),
         "config": {"sr": sr, "spk_embed_dim": 109},
         "info": f"Clonada trained model - {epochs} epochs",
     }, model_path)
