@@ -439,7 +439,14 @@ def run_inference(job_input):
     try:
         # Download inputs
         audio_path = download_file(audio_url, os.path.join(work_dir, "input.wav"))
-        model_path = download_file(model_url, os.path.join(work_dir, "model.pth"))
+
+        use_pretrained = job_input.get("use_pretrained", False)
+        if use_pretrained:
+            model_path = os.path.join(WEIGHTS_DIR, "pretrained_v2", "f0G40k.pth")
+            print(f"[INFER] Using pretrained model: {model_path}")
+        else:
+            model_path = download_file(model_url, os.path.join(work_dir, "model.pth"))
+
         index_path = None
         if index_url:
             index_path = download_file(index_url, os.path.join(work_dir, "model.index"))
