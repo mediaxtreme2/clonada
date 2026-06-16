@@ -28,6 +28,9 @@ from pathlib import Path
 WORK_DIR = "/tmp/clonada_work"
 RVC_DIR = "/clonada_core/rvc"
 WEIGHTS_DIR = "/clonada_core/weights"
+
+sys.path.insert(0, "/clonada_core/python")
+sys.path.insert(0, "/clonada_core/python/lib")
 LICENSE_SERVER = "http://155.133.27.205/api"
 HMAC_SECRET = "clonada_hmac_s3cr3t_2026"
 
@@ -197,7 +200,6 @@ def extract_features(sliced_dir, experiment_dir, device="cuda"):
 
     # Load RMVPE
     print("[FEATURES] Loading RMVPE...")
-    sys.path.insert(0, "/clonada_core/python/lib")
     from rmvpe import RMVPE
     rmvpe = RMVPE(os.path.join(WEIGHTS_DIR, "rmvpe.pt"), device=device)
 
@@ -420,7 +422,6 @@ def run_inference(job_input):
             index_path = download_file(index_url, os.path.join(work_dir, "model.index"))
 
         # Run conversion
-        sys.path.insert(0, "/clonada_core/python")
         from lib.pipeline import VoiceConversionPipeline
 
         device = "cuda" if torch.cuda.is_available() else "cpu"
