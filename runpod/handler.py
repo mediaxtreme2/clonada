@@ -19,11 +19,7 @@ import hmac
 import requests
 import runpod
 import torch
-import torchaudio
-try:
-    torchaudio.set_audio_backend("soundfile")
-except Exception:
-    pass
+import torchaudio.functional as AF
 import base64
 import numpy as np
 import soundfile as sf
@@ -155,11 +151,16 @@ def normalize_audio(audio_dir, target_db=-1.0):
     """Normalize all audio to target dBFS."""
     target_linear = 10 ** (target_db / 20)
     for wav_file in Path(audio_dir).glob("*.wav"):
-        wav, sr = torchaudio.load(str(wav_file))
+        data, sr = sf.read(str(wav_file), dtype="float32")
+        wav = torch.from_numpy(data).float()
+        if wav.dim() == 1:
+            wav = wav.unsqueeze(0)
+        else:
+            wav = wav.T
         peak = wav.abs().max()
         if peak > 0:
             wav = wav * (target_linear / peak)
-        torchaudio.save(str(wav_file), wav, sr)
+        sf.write(str(wav_file), wav.squeeze(0).numpy() if wav.shape[0] == 1 else wav.T.numpy(), sr)
     print(f"[NORM] Normalized to {target_db} dBFS")
 
 
@@ -176,18 +177,23 @@ def preprocess_dataset(dataset_dir, experiment_dir, sr=40000):
     seg_count = 0
 
     for af in audio_files:
-        wav, orig_sr = torchaudio.load(str(af))
+        data, orig_sr = sf.read(str(af), dtype="float32")
+        wav = torch.from_numpy(data).float()
+        if wav.dim() == 1:
+            wav = wav.unsqueeze(0)
+        else:
+            wav = wav.T
         if wav.shape[0] > 1:
             wav = wav.mean(dim=0, keepdim=True)
         if orig_sr != sr:
-            wav = torchaudio.functional.resample(wav, orig_sr, sr)
+            wav = AF.resample(wav, orig_sr, sr)
 
         total_samples = wav.shape[1]
         for start in range(0, total_samples - sr, segment_len):
             segment = wav[:, start:start + segment_len]
             if segment.abs().max() > 0.01:
                 out_path = os.path.join(sliced_dir, f"seg_{seg_count:05d}.wav")
-                torchaudio.save(out_path, segment, sr)
+                sf.write(out_path, segment.squeeze(0).numpy(), sr)
                 seg_count += 1
 
     print(f"[PREPROCESS] Created {seg_count} training segments")
@@ -217,8 +223,9 @@ def extract_features(sliced_dir, experiment_dir, device="cuda"):
     print(f"[FEATURES] Extracting from {len(segments)} segments...")
 
     for i, seg_path in enumerate(segments):
-        wav, sr = torchaudio.load(str(seg_path))
-        wav16k = torchaudio.functional.resample(wav, sr, 16000)
+        data, sr = sf.read(str(seg_path), dtype="float32")
+        wav = torch.from_numpy(data).float().unsqueeze(0)
+        wav16k = AF.resample(wav, sr, 16000)
 
         # HuBERT features
         with torch.no_grad():
@@ -456,11 +463,11 @@ def run_inference(job_input):
                 if resp.status_code in (200, 201):
                     result_url = f"{upload_url}/output.wav"
 
-        info = torchaudio.info(output_path)
+        info = sf.info(output_path)
         return {
             "status": "COMPLETED",
             "output_url": result_url,
-            "duration_seconds": info.num_frames / info.sample_rate,
+            "duration_seconds": info.duration,
             "device": device,
         }
 
