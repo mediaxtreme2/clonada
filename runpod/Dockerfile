@@ -20,8 +20,10 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 # Copy inference pipeline (copied by CI before build)
 COPY python /clonada_core/python
 
-# Pre-fetch HuBERT via transformers cache
-RUN python3 -c "from transformers import HubertModel; HubertModel.from_pretrained('facebook/hubert-base-ls960')"
+# Pre-fetch RVC-compatible HuBERT (content-vec-768, NOT facebook/hubert-base-ls960)
+RUN mkdir -p /clonada_core/weights && \
+    wget -q https://huggingface.co/lj1995/VoiceConversionWebUI/resolve/main/hubert_base.pt \
+    -O /clonada_core/weights/hubert_base.pt
 
 # Pre-fetch RMVPE weights
 RUN mkdir -p /clonada_core/weights && \
