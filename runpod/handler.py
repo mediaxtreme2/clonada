@@ -123,12 +123,15 @@ def clean_vocals(input_dir, output_dir):
 
     for i, af in enumerate(audio_files):
         print(f"[CLEAN] ({i+1}/{len(audio_files)}) {af.name}")
-        result = subprocess.run(
-            ["python3", "-m", "demucs", "--two-stems=vocals", "-o", output_dir, str(af)],
-            capture_output=True, text=True, timeout=600
-        )
-        if result.returncode != 0:
-            print(f"[WARN] Demucs failed for {af.name}: {result.stderr[:200]}")
+        try:
+            result = subprocess.run(
+                ["python3", "-m", "demucs", "--two-stems=vocals", "-o", output_dir, str(af)],
+                capture_output=True, text=True, timeout=3600
+            )
+            if result.returncode != 0:
+                print(f"[WARN] Demucs failed for {af.name}: {result.stderr[:200]}")
+        except subprocess.TimeoutExpired:
+            print(f"[WARN] Demucs timed out for {af.name}")
 
     vocals_dir = os.path.join(output_dir, "clean_vocals")
     os.makedirs(vocals_dir, exist_ok=True)
@@ -137,6 +140,9 @@ def clean_vocals(input_dir, output_dir):
         shutil.copy2(str(vf), dest)
 
     count = len(list(Path(vocals_dir).glob("*.wav")))
+    if count == 0:
+        print("[WARN] Demucs produced no vocals, falling back to original audio")
+        return input_dir
     print(f"[CLEAN] Extracted {count} clean vocal stems")
     return vocals_dir
 
