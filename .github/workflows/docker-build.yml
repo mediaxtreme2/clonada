@@ -17,14 +17,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Sync to public worker repo
+      - name: Sync to worker repo
         env:
-          GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN }}
+          GH_TOKEN: ${{ secrets.WORKER_REPO_TOKEN }}
         run: |
-          git clone https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository_owner }}/clonada-worker.git worker
+          git clone https://x-access-token:${GH_TOKEN}@github.com/anirudhatalmale6-alt/clonada-worker.git worker
           cd worker
           rm -rf python/lib handler.py Dockerfile requirements.txt
-          cp -r ../python/lib python/lib
+          mkdir -p python/lib
+          cp -r ../python/lib/* python/lib/
           cp ../runpod/handler.py .
           cp ../runpod/Dockerfile .
           cp ../runpod/requirements.txt .
