@@ -461,13 +461,24 @@ def run_inference(job_input):
             mode="high_quality"
         )
 
-        # Upload result
+        # Upload result to staging server
         result_url = ""
-        if upload_url and os.path.exists(output_path):
-            with open(output_path, "rb") as f:
-                resp = requests.put(f"{upload_url}/output.wav", data=f, timeout=120)
-                if resp.status_code in (200, 201):
-                    result_url = f"{upload_url}/output.wav"
+        upload_base = job_input.get("upload_base", "https://client.revenuivaai.com")
+        if os.path.exists(output_path):
+            try:
+                out_name = f"clonada_swap_{os.path.basename(audio_url).replace('.wav','')}.wav"
+                with open(output_path, "rb") as f:
+                    resp = requests.post(
+                        f"{upload_base}/clonada-upload.php?name={out_name}",
+                        data=f.read(),
+                        headers={"X-Upload-Secret": "clonada_upload_2026", "Content-Type": "application/octet-stream"},
+                        timeout=300,
+                    )
+                if resp.status_code == 200:
+                    result_url = f"{upload_base}/clonada-tmp/{out_name}"
+                    print(f"[INFER] Output uploaded: {result_url}")
+            except Exception as e:
+                print(f"[INFER] Upload error: {e}")
 
         info = sf.info(output_path)
         return {
