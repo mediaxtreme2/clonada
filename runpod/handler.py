@@ -543,18 +543,46 @@ def run_training(job_input):
             upload_result = upload_results(model_path, index_path, upload_url)
             model_url = f"{upload_url}/{os.path.basename(model_path)}"
 
-        # Base64-encode model for inline transfer (fallback when no upload_url)
-        model_b64 = ""
+        # Upload model to staging server (base64 inline is too large for RunPod response)
+        staging_url = ""
         if model_path and os.path.exists(model_path):
-            with open(model_path, "rb") as mf:
-                model_b64 = base64.b64encode(mf.read()).decode()
-            print(f"[TRAIN] Model encoded: {len(model_b64)} chars base64")
+            model_size = os.path.getsize(model_path)
+            print(f"[TRAIN] Model size: {model_size / 1024 / 1024:.1f} MB")
+            try:
+                fname = os.path.basename(model_path)
+                with open(model_path, "rb") as mf:
+                    resp = requests.put(
+                        f"https://client.revenuivaai.com/clonada-upload.php?name={fname}",
+                        data=mf,
+                        headers={"X-Upload-Secret": "clonada_upload_2026", "Content-Type": "application/octet-stream"},
+                        timeout=300,
+                    )
+                if resp.status_code == 200:
+                    staging_url = f"https://client.revenuivaai.com/clonada-tmp/{fname}"
+                    print(f"[TRAIN] Model uploaded: {staging_url}")
+                else:
+                    print(f"[TRAIN] Upload failed: {resp.status_code} {resp.text[:200]}")
+            except Exception as e:
+                print(f"[TRAIN] Upload error: {e}")
+
+            # Also upload index if exists
+            if index_path and os.path.exists(index_path):
+                try:
+                    idx_name = os.path.basename(index_path)
+                    with open(index_path, "rb") as idx_f:
+                        requests.put(
+                            f"https://client.revenuivaai.com/clonada-upload.php?name={idx_name}",
+                            data=idx_f,
+                            headers={"X-Upload-Secret": "clonada_upload_2026", "Content-Type": "application/octet-stream"},
+                            timeout=120,
+                        )
+                except Exception:
+                    pass
 
         result = {
             "status": "COMPLETED",
             "model_name": model_name,
-            "model_url": model_url,
-            "model_data": model_b64,
+            "model_url": staging_url or model_url,
             "epochs_completed": epochs,
             "device": device,
             "upload": upload_result,
