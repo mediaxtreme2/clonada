@@ -42,7 +42,7 @@ def verify_license(license_key, feature="train"):
         )
         data = resp.json()
         sig = data.pop("signature", "")
-        payload = json.dumps(data, sort_keys=True, separators=(",", ":"))
+        payload = json.dumps(data, separators=(",", ":"))
         expected = hmac.new(HMAC_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()
         if not hmac.compare_digest(expected, sig):
             return False, "Invalid server signature"
