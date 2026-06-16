@@ -27,32 +27,32 @@ class HuBERTFeatureExtractor:
         if self.model is not None:
             return True
 
+        # Try fairseq content-vec HuBERT FIRST (required for RVC v2 compatibility)
+        if os.path.exists(self.model_path):
+            try:
+                from fairseq import checkpoint_utils
+                models, _, _ = checkpoint_utils.load_model_ensemble_and_task(
+                    [self.model_path], suffix=""
+                )
+                self.model = models[0].to(self.device)
+                self.model.eval()
+                self._use_transformers = False
+                print(f"[OK] HuBERT loaded from {self.model_path} (fairseq content-vec)")
+                return True
+            except Exception as e:
+                print(f"[WARN] Fairseq HuBERT failed: {e}, trying transformers fallback...")
+
+        # Fallback to transformers (lower quality for RVC but works without weights file)
         try:
             from transformers import HubertModel
             self.model = HubertModel.from_pretrained("facebook/hubert-base-ls960")
             self.model = self.model.to(self.device)
             self.model.eval()
             self._use_transformers = True
-            print("[OK] HuBERT loaded via transformers (facebook/hubert-base-ls960)")
+            print("[WARN] HuBERT loaded via transformers fallback (lower quality for RVC)")
             return True
         except Exception as e:
-            print(f"[WARN] Transformers HuBERT failed: {e}, trying fairseq...")
-
-        if not os.path.exists(self.model_path):
-            print(f"[ERROR] HuBERT weights not found: {self.model_path}")
-            return False
-
-        try:
-            from fairseq import checkpoint_utils
-            models, _, _ = checkpoint_utils.load_model_ensemble_and_task(
-                [self.model_path], suffix=""
-            )
-            self.model = models[0].to(self.device)
-            self.model.eval()
-            print(f"[OK] HuBERT loaded from {self.model_path}")
-            return True
-        except Exception as e:
-            print(f"[ERROR] HuBERT load failed: {e}")
+            print(f"[ERROR] All HuBERT loading methods failed: {e}")
             return False
 
     def extract(self, audio_16k, chunk_seconds=30):
