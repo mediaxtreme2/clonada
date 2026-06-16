@@ -543,11 +543,13 @@ def run_training(job_input):
             upload_result = upload_results(model_path, index_path, upload_url)
             model_url = f"{upload_url}/{os.path.basename(model_path)}"
 
-        # Upload model to staging server (base64 inline is too large for RunPod response)
+        # Upload model to staging server
         staging_url = ""
+        upload_log = []
+        model_size_mb = 0
         if model_path and os.path.exists(model_path):
-            model_size = os.path.getsize(model_path)
-            print(f"[TRAIN] Model size: {model_size / 1024 / 1024:.1f} MB")
+            model_size_mb = round(os.path.getsize(model_path) / 1024 / 1024, 1)
+            upload_log.append(f"model_exists=true size={model_size_mb}MB path={model_path}")
             upload_base = job_input.get("upload_base", "https://client.revenuivaai.com")
             upload_secret = "clonada_upload_2026"
             for fpath, label in [(model_path, "model"), (index_path, "index")]:
@@ -557,26 +559,29 @@ def run_training(job_input):
                 try:
                     with open(fpath, "rb") as uf:
                         file_data = uf.read()
-                    print(f"[TRAIN] Uploading {label} ({len(file_data)} bytes): {fname}")
+                    upload_log.append(f"uploading_{label}={len(file_data)}bytes to={upload_base}")
                     resp = requests.post(
                         f"{upload_base}/clonada-upload.php?name={fname}",
                         data=file_data,
                         headers={"X-Upload-Secret": upload_secret, "Content-Type": "application/octet-stream"},
                         timeout=300,
                     )
-                    print(f"[TRAIN] Upload response: {resp.status_code} {resp.text[:200]}")
+                    upload_log.append(f"resp_{label}={resp.status_code} body={resp.text[:100]}")
                     if resp.status_code == 200 and label == "model":
                         staging_url = f"{upload_base}/clonada-tmp/{fname}"
                 except Exception as e:
-                    print(f"[TRAIN] Upload error for {label}: {e}")
+                    upload_log.append(f"error_{label}={str(e)[:200]}")
+        else:
+            upload_log.append(f"model_exists=false path={model_path}")
 
         result = {
             "status": "COMPLETED",
             "model_name": model_name,
             "model_url": staging_url or model_url,
+            "model_size_mb": model_size_mb,
             "epochs_completed": epochs,
             "device": device,
-            "upload": upload_result,
+            "upload_log": upload_log,
         }
 
         send_webhook(webhook_url, result)
