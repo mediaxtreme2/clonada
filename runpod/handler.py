@@ -369,7 +369,13 @@ def train_rvc_v2(experiment_dir, model_name, epochs=100, batch_size=8, sr=40000)
     model_path = os.path.join(output_dir, f"{model_name}.pth")
     torch.save({
         "weight": model.state_dict(),
-        "config": {"sr": sr, "spk_embed_dim": 109},
+        "config": [
+            1025, 32, 192, 192, 768, 2, 6, 3, 0.0, "1",
+            [3, 7, 11], [[1, 3, 5], [1, 3, 5], [1, 3, 5]],
+            [10, 10, 2, 2], 512, [16, 16, 4, 4], 109, 256, sr, 768,
+        ],
+        "f0": 1,
+        "version": "v2",
         "info": f"Clonada trained model - {epochs} epochs",
     }, model_path)
 
