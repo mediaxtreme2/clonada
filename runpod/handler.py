@@ -548,36 +548,27 @@ def run_training(job_input):
         if model_path and os.path.exists(model_path):
             model_size = os.path.getsize(model_path)
             print(f"[TRAIN] Model size: {model_size / 1024 / 1024:.1f} MB")
-            try:
-                fname = os.path.basename(model_path)
-                with open(model_path, "rb") as mf:
-                    resp = requests.put(
-                        f"https://client.revenuivaai.com/clonada-upload.php?name={fname}",
-                        data=mf,
-                        headers={"X-Upload-Secret": "clonada_upload_2026", "Content-Type": "application/octet-stream"},
+            upload_base = job_input.get("upload_base", "https://client.revenuivaai.com")
+            upload_secret = "clonada_upload_2026"
+            for fpath, label in [(model_path, "model"), (index_path, "index")]:
+                if not fpath or not os.path.exists(fpath):
+                    continue
+                fname = os.path.basename(fpath)
+                try:
+                    with open(fpath, "rb") as uf:
+                        file_data = uf.read()
+                    print(f"[TRAIN] Uploading {label} ({len(file_data)} bytes): {fname}")
+                    resp = requests.post(
+                        f"{upload_base}/clonada-upload.php?name={fname}",
+                        data=file_data,
+                        headers={"X-Upload-Secret": upload_secret, "Content-Type": "application/octet-stream"},
                         timeout=300,
                     )
-                if resp.status_code == 200:
-                    staging_url = f"https://client.revenuivaai.com/clonada-tmp/{fname}"
-                    print(f"[TRAIN] Model uploaded: {staging_url}")
-                else:
-                    print(f"[TRAIN] Upload failed: {resp.status_code} {resp.text[:200]}")
-            except Exception as e:
-                print(f"[TRAIN] Upload error: {e}")
-
-            # Also upload index if exists
-            if index_path and os.path.exists(index_path):
-                try:
-                    idx_name = os.path.basename(index_path)
-                    with open(index_path, "rb") as idx_f:
-                        requests.put(
-                            f"https://client.revenuivaai.com/clonada-upload.php?name={idx_name}",
-                            data=idx_f,
-                            headers={"X-Upload-Secret": "clonada_upload_2026", "Content-Type": "application/octet-stream"},
-                            timeout=120,
-                        )
-                except Exception:
-                    pass
+                    print(f"[TRAIN] Upload response: {resp.status_code} {resp.text[:200]}")
+                    if resp.status_code == 200 and label == "model":
+                        staging_url = f"{upload_base}/clonada-tmp/{fname}"
+                except Exception as e:
+                    print(f"[TRAIN] Upload error for {label}: {e}")
 
         result = {
             "status": "COMPLETED",
