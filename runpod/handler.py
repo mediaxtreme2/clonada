@@ -216,8 +216,7 @@ def extract_features(sliced_dir, experiment_dir, device="cuda"):
         np.save(feat_path, feats)
 
         # RMVPE pitch
-        audio_np = wav16k.squeeze().numpy()
-        f0 = rmvpe.extract(audio_np, sr=16000)
+        f0 = rmvpe.infer_from_audio(wav16k.squeeze())
         f0_path = os.path.join(f0_dir, seg_path.stem + ".npy")
         np.save(f0_path, f0)
 
