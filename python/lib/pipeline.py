@@ -248,7 +248,7 @@ class VoiceConversionPipeline:
                 [10, 10, 2, 2], 512, [16, 16, 4, 4], 109, 256, 40000
             )
 
-        self.net_g.load_state_dict(cpt["weight"], strict=False)
+        self.net_g.load_state_dict(cpt.get("weight", cpt.get("model", cpt)), strict=False)
         self.net_g = self.net_g.to(self.device)
         self.net_g.eval()
 
