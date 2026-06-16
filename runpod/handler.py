@@ -20,6 +20,10 @@ import requests
 import runpod
 import torch
 import torchaudio
+try:
+    torchaudio.set_audio_backend("soundfile")
+except Exception:
+    pass
 import base64
 import numpy as np
 import soundfile as sf
