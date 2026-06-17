@@ -495,11 +495,16 @@ def run_inference(job_input):
                 print(f"[INFER] Upload error: {e}")
 
         info = sf.info(output_path)
+        hubert_type = "fairseq" if not getattr(pipeline.hubert, '_use_transformers', True) else "transformers"
+        hubert_size = os.path.getsize(hubert_path) if os.path.exists(hubert_path) else 0
         return {
             "status": "COMPLETED",
             "output_url": result_url,
             "duration_seconds": info.duration,
             "device": device,
+            "hubert_type": hubert_type,
+            "hubert_file_mb": round(hubert_size / 1024 / 1024, 1),
+            "model_used": os.path.basename(model_path),
         }
 
     finally:
