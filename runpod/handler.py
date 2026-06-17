@@ -453,33 +453,27 @@ def run_inference(job_input):
 
         output_path = os.path.join(work_dir, "output.wav")
 
-        # Use rvc-python library (proven, tested RVC pipeline)
-        try:
-            from rvc_python.infer import RVCInference
-            print("[INFER] Using rvc-python library")
-            device_str = "cuda:0" if torch.cuda.is_available() else "cpu"
-            rvc = RVCInference(device=device_str)
-            rvc.load_model(model_path, index_path=index_path or "")
-            rvc.infer_file(
-                audio_path, output_path,
-                f0_method=method,
-                f0_up_key=pitch_shift,
-                index_rate=index_rate,
-            )
-        except Exception as rvc_err:
-            print(f"[INFER] rvc-python failed: {rvc_err}, falling back to custom pipeline")
-            from lib.pipeline import VoiceConversionPipeline
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            pipeline = VoiceConversionPipeline(weights_dir=WEIGHTS_DIR, device=device)
-            pipeline.load_model(model_path, index_path)
-            pipeline.convert(
-                audio_path, output_path,
-                pitch_shift=pitch_shift,
-                method=method,
-                mix=mix,
-                index_rate=index_rate,
-                mode="high_quality"
-            )
+        # Ensure hubert_base.pt exists (download at runtime if missing)
+        hubert_path = os.path.join(WEIGHTS_DIR, "hubert_base.pt")
+        if not os.path.exists(hubert_path):
+            print("[INFER] Downloading hubert_base.pt (content-vec for RVC)...")
+            download_file("https://huggingface.co/lj1995/VoiceConversionWebUI/resolve/main/hubert_base.pt", hubert_path)
+
+        # Run conversion with custom pipeline
+        from lib.pipeline import VoiceConversionPipeline
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        pipeline = VoiceConversionPipeline(weights_dir=WEIGHTS_DIR, device=device)
+        print(f"[INFER] HuBERT path exists: {os.path.exists(hubert_path)}, size: {os.path.getsize(hubert_path) if os.path.exists(hubert_path) else 0}")
+        pipeline.load_model(model_path, index_path)
+        print(f"[INFER] HuBERT type: {'fairseq' if not getattr(pipeline.hubert, '_use_transformers', True) else 'transformers'}")
+        pipeline.convert(
+            audio_path, output_path,
+            pitch_shift=pitch_shift,
+            method=method,
+            mix=mix,
+            index_rate=index_rate,
+            mode="high_quality"
+        )
 
         # Upload result to staging server
         result_url = ""

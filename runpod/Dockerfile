@@ -8,14 +8,23 @@ ENV PYTHONUNBUFFERED=1
 RUN apt-get update && apt-get install -y \
     python3.10 \
     python3-pip \
+    python3.10-dev \
+    build-essential \
     ffmpeg \
     git \
     wget \
     && rm -rf /var/lib/apt/lists/*
 
+# Install fairseq first (needs build tools)
+RUN pip3 install --no-cache-dir fairseq==0.12.2 || \
+    pip3 install --no-cache-dir fairseq
+
 # Python dependencies
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
+
+# Verify fairseq loads
+RUN python3 -c "from fairseq import checkpoint_utils; print('[OK] fairseq loaded')"
 
 # Copy inference pipeline (copied by CI before build)
 COPY python /clonada_core/python
