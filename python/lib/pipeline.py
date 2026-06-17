@@ -33,15 +33,20 @@ class HuBERTFeatureExtractor:
             try:
                 from fairseq import checkpoint_utils
                 import traceback
+                # PyTorch 2.6+ defaults weights_only=True which breaks fairseq
+                _orig_load = torch.load
+                torch.load = lambda *a, **kw: _orig_load(*a, **{**kw, "weights_only": False})
                 models, _, _ = checkpoint_utils.load_model_ensemble_and_task(
                     [self.model_path], suffix=""
                 )
+                torch.load = _orig_load
                 self.model = models[0].to(self.device)
                 self.model.eval()
                 self._use_transformers = False
                 print(f"[OK] HuBERT loaded from {self.model_path} (fairseq content-vec)")
                 return True
             except Exception as e:
+                torch.load = _orig_load
                 self._fairseq_error = f"{type(e).__name__}: {str(e)[:500]}"
                 print(f"[WARN] Fairseq HuBERT failed: {self._fairseq_error}")
                 traceback.print_exc()
