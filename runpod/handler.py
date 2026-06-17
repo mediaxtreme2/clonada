@@ -497,6 +497,7 @@ def run_inference(job_input):
         info = sf.info(output_path)
         hubert_type = "fairseq" if not getattr(pipeline.hubert, '_use_transformers', True) else "transformers"
         hubert_size = os.path.getsize(hubert_path) if os.path.exists(hubert_path) else 0
+        fairseq_err = getattr(pipeline.hubert, '_fairseq_error', None)
         return {
             "status": "COMPLETED",
             "output_url": result_url,
@@ -505,6 +506,7 @@ def run_inference(job_input):
             "hubert_type": hubert_type,
             "hubert_file_mb": round(hubert_size / 1024 / 1024, 1),
             "model_used": os.path.basename(model_path),
+            "fairseq_error": fairseq_err,
         }
 
     finally:

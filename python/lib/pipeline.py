@@ -28,9 +28,11 @@ class HuBERTFeatureExtractor:
             return True
 
         # Try fairseq content-vec HuBERT FIRST (required for RVC v2 compatibility)
+        self._fairseq_error = None
         if os.path.exists(self.model_path):
             try:
                 from fairseq import checkpoint_utils
+                import traceback
                 models, _, _ = checkpoint_utils.load_model_ensemble_and_task(
                     [self.model_path], suffix=""
                 )
@@ -40,7 +42,9 @@ class HuBERTFeatureExtractor:
                 print(f"[OK] HuBERT loaded from {self.model_path} (fairseq content-vec)")
                 return True
             except Exception as e:
-                print(f"[WARN] Fairseq HuBERT failed: {e}, trying transformers fallback...")
+                self._fairseq_error = f"{type(e).__name__}: {str(e)[:500]}"
+                print(f"[WARN] Fairseq HuBERT failed: {self._fairseq_error}")
+                traceback.print_exc()
 
         # Fallback to transformers (lower quality for RVC but works without weights file)
         try:
